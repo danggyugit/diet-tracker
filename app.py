@@ -40,11 +40,11 @@ pg = st.navigation(PAGES, position="sidebar")
 # ─── 상단 네비게이션 바 ──────────────────────────────────────
 if is_logged_in():
     NAV_MAP = {
-        "🍽️": "pages/record.py",
-        "📅": "pages/calendar_view.py",
-        "📊": "pages/trends.py",
-        "👤": "pages/profile.py",
-        "⭐": "pages/favorites.py",
+        "  🍽️  ": "pages/record.py",
+        "  📅  ": "pages/calendar_view.py",
+        "  📊  ": "pages/trends.py",
+        "  👤  ": "pages/profile.py",
+        "  ⭐  ": "pages/favorites.py",
     }
     selected = st.pills(
         "nav", list(NAV_MAP.keys()),
