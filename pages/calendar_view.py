@@ -1,4 +1,7 @@
-"""📅 캘린더 페이지 — 월별 칼로리 히트맵 + 일자 드릴다운."""
+"""📅 캘린더 페이지 — 월별 칼로리 히트맵 + 일자 드릴다운.
+
+HTML 테이블 기반 캘린더로 모바일에서도 7열 그리드 유지.
+"""
 
 import calendar
 import datetime
@@ -32,8 +35,6 @@ if "cal_year" not in st.session_state:
     st.session_state.cal_year = datetime.date.today().year
 if "cal_month" not in st.session_state:
     st.session_state.cal_month = datetime.date.today().month
-if "cal_selected_date" not in st.session_state:
-    st.session_state.cal_selected_date = None
 
 col_prev, col_title, col_next = st.columns([1, 3, 1])
 with col_prev:
@@ -43,7 +44,6 @@ with col_prev:
             st.session_state.cal_year -= 1
         else:
             st.session_state.cal_month -= 1
-        st.session_state.cal_selected_date = None
         st.rerun()
 with col_title:
     st.markdown(
@@ -58,7 +58,6 @@ with col_next:
             st.session_state.cal_year += 1
         else:
             st.session_state.cal_month += 1
-        st.session_state.cal_selected_date = None
         st.rerun()
 
 year = st.session_state.cal_year
@@ -73,69 +72,84 @@ if not totals_df.empty:
     for _, row in totals_df.iterrows():
         daily_map[row["date"]] = int(row["total_cal"])
 
-# ─── 캘린더 그리드 ───────────────────────────────────────────
-cal = calendar.Calendar(firstweekday=0)  # 월요일 시작
+# ─── HTML 캘린더 테이블 ──────────────────────────────────────
+cal = calendar.Calendar(firstweekday=0)
 weeks = cal.monthdatescalendar(year, month)
+today = datetime.date.today()
 
-# 요일 헤더
-day_names = ["월", "화", "수", "목", "금", "토", "일"]
-header_cols = st.columns(7)
-for i, name in enumerate(day_names):
-    header_cols[i].markdown(f"<div style='text-align:center;font-weight:bold;color:#94A3B8;'>{name}</div>", unsafe_allow_html=True)
+def _cell_color(cal_val: int) -> tuple[str, str]:
+    if cal_val == 0:
+        return "rgba(30,41,59,0.5)", "#64748B"
+    elif cal_val < target * 0.8:
+        return "rgba(22,101,52,0.5)", "#86EFAC"
+    elif cal_val <= target * 1.1:
+        return "rgba(34,197,94,0.4)", "#22C55E"
+    elif cal_val <= target * 1.3:
+        return "rgba(253,224,71,0.3)", "#FBBF24"
+    else:
+        return "rgba(239,68,68,0.3)", "#EF4444"
 
-# 주별 그리드
+html = """
+<style>
+.cal-table { width:100%; border-collapse:separate; border-spacing:3px; table-layout:fixed; }
+.cal-table th { text-align:center; color:#94A3B8; font-size:13px; font-weight:600; padding:4px 0; }
+.cal-table td { border-radius:8px; padding:4px; vertical-align:top; height:58px; }
+.cal-day { font-size:11px; color:#94A3B8; }
+.cal-val { font-size:14px; font-weight:600; }
+.cal-unit { font-size:9px; color:#64748B; }
+</style>
+<table class="cal-table">
+<tr><th>월</th><th>화</th><th>수</th><th>목</th><th>금</th><th>토</th><th>일</th></tr>
+"""
+
 for week in weeks:
-    week_cols = st.columns(7)
-    for i, day in enumerate(week):
-        with week_cols[i]:
-            if day.month != month:
-                st.markdown("<div style='height:65px;'></div>", unsafe_allow_html=True)
-                continue
+    html += "<tr>"
+    for day in week:
+        if day.month != month:
+            html += "<td style='background:transparent;'></td>"
+            continue
 
-            date_key = day.isoformat()
-            cal_val = daily_map.get(date_key, 0)
+        date_key = day.isoformat()
+        cal_val = daily_map.get(date_key, 0)
+        bg, text_color = _cell_color(cal_val)
+        border = "2px solid #3B82F6" if day == today else "1px solid rgba(148,163,184,0.15)"
 
-            # 색상: 초록(부족) → 노랑(적정) → 빨강(초과)
-            if cal_val == 0:
-                bg = "rgba(30,41,59,0.5)"
-                text_color = "#64748B"
-            elif cal_val < target * 0.8:
-                bg = "rgba(22,101,52,0.5)"
-                text_color = "#86EFAC"
-            elif cal_val <= target * 1.1:
-                bg = "rgba(34,197,94,0.4)"
-                text_color = "#22C55E"
-            elif cal_val <= target * 1.3:
-                bg = "rgba(253,224,71,0.3)"
-                text_color = "#FBBF24"
-            else:
-                bg = "rgba(239,68,68,0.3)"
-                text_color = "#EF4444"
+        html += (
+            f"<td style='background:{bg};border:{border};'>"
+            f"<div class='cal-day'>{day.day}</div>"
+            f"<div class='cal-val' style='color:{text_color};'>{cal_val:,}</div>"
+            f"<div class='cal-unit'>kcal</div>"
+            f"</td>"
+        )
+    html += "</tr>"
 
-            is_today = day == datetime.date.today()
-            border = "2px solid #3B82F6" if is_today else "1px solid rgba(148,163,184,0.15)"
+html += "</table>"
+st.markdown(html, unsafe_allow_html=True)
 
-            st.markdown(
-                f"<div style='background:{bg};border:{border};border-radius:8px;"
-                f"padding:4px 6px;height:65px;cursor:pointer;'>"
-                f"<div style='font-size:12px;color:#94A3B8;'>{day.day}</div>"
-                f"<div style='font-size:14px;font-weight:600;color:{text_color};'>"
-                f"{cal_val:,}</div>"
-                f"<div style='font-size:9px;color:#64748B;'>kcal</div>"
-                f"</div>",
-                unsafe_allow_html=True,
-            )
-            if st.button("상세", key=f"cal_{date_key}", use_container_width=True):
-                st.session_state.cal_selected_date = date_key
-                st.rerun()
+# ─── 색상 범례 ───────────────────────────────────────────────
+st.caption(
+    f"🟢 목표 이하 · 🟡 목표 근접 · 🔴 목표 초과 (목표: {target:,} kcal)"
+)
 
 # ═══════════════════════════════════════════════════════════════
-# 드릴다운: 선택된 날짜 상세
+# 드릴다운: 날짜 선택
 # ═══════════════════════════════════════════════════════════════
 
-sel_date = st.session_state.cal_selected_date
+st.divider()
+
+# 기록이 있는 날짜 목록
+recorded_dates = sorted(daily_map.keys(), reverse=True)
+if recorded_dates:
+    sel_date = st.selectbox(
+        "날짜 선택 (상세 보기)",
+        recorded_dates,
+        format_func=lambda d: f"{d} ({daily_map.get(d, 0):,} kcal)",
+    )
+else:
+    sel_date = None
+    st.caption("이번 달 기록이 없습니다.")
+
 if sel_date:
-    st.divider()
     st.subheader(f"📋 {sel_date} 상세")
 
     day_meals = get_meals_for_date(email, sel_date)
@@ -143,15 +157,14 @@ if sel_date:
 
     # 컨디션 & 메모
     if day_memo:
-        mc1, mc2 = st.columns([1, 3])
-        mc1.markdown(f"**컨디션**: {day_memo.get('condition', '')}")
-        if day_memo.get("memo"):
-            mc2.markdown(f"**메모**: {day_memo['memo']}")
+        st.markdown(
+            f"**📝 컨디션**: {day_memo.get('condition', '')}  \n"
+            f"**메모**: {day_memo.get('memo', '') or '없음'}",
+        )
 
     if day_meals.empty:
         st.info("이 날의 식단 기록이 없습니다.")
     else:
-        # 매크로 파이 차트
         for c in ["total_cal", "carbs", "protein", "fat", "quantity"]:
             day_meals[c] = day_meals[c].apply(lambda x: float(x) if x else 0)
 
@@ -160,33 +173,32 @@ if sel_date:
         t_fat = (day_meals["fat"] * day_meals["quantity"]).sum()
         t_cal = day_meals["total_cal"].sum()
 
-        col_pie, col_list = st.columns([1, 2])
-        with col_pie:
-            fig = go.Figure(go.Pie(
-                labels=["탄수화물", "단백질", "지방"],
-                values=[t_carbs, t_protein, t_fat],
-                marker=dict(colors=["#FBBF24", "#EF4444", "#6B7280"]),
-                textinfo="label+percent",
-                hole=0.4,
-            ))
-            fig.update_layout(
-                **PLOT_CFG, height=250, showlegend=False,
-                margin=dict(l=10, r=10, t=10, b=10),
-            )
-            st.plotly_chart(fig, use_container_width=True)
-            st.metric("총 칼로리", f"{t_cal:,.0f} kcal")
+        # 총합 + 매크로
+        st.metric("총 칼로리", f"{t_cal:,.0f} kcal")
 
-        with col_list:
-            for mt in MEAL_TYPES:
-                meal_df = day_meals[day_meals["meal_type"] == mt]
-                if meal_df.empty:
-                    continue
-                st.markdown(f"**{mt}**")
-                for _, row in meal_df.iterrows():
-                    st.caption(
-                        f"  · {row['food_name']} ({row.get('amount', '')}) "
-                        f"— {row.get('total_cal', 0)} kcal"
-                    )
+        fig = go.Figure(go.Pie(
+            labels=["탄수화물", "단백질", "지방"],
+            values=[t_carbs, t_protein, t_fat],
+            marker=dict(colors=["#FBBF24", "#EF4444", "#6B7280"]),
+            textinfo="label+percent",
+            hole=0.4,
+        ))
+        fig.update_layout(
+            **PLOT_CFG, height=220, showlegend=False,
+            margin=dict(l=10, r=10, t=10, b=10),
+        )
+        st.plotly_chart(fig, use_container_width=True)
+
+        for mt in MEAL_TYPES:
+            meal_df = day_meals[day_meals["meal_type"] == mt]
+            if meal_df.empty:
+                continue
+            st.markdown(f"**{mt}** ({meal_df['total_cal'].sum():,.0f} kcal)")
+            for _, row in meal_df.iterrows():
+                st.caption(
+                    f"  · {row['food_name']} ({row.get('amount', '')}) "
+                    f"— {row.get('total_cal', 0)} kcal"
+                )
 
     if not day_memo and day_meals.empty:
         st.info("이 날의 기록이 없습니다.")
