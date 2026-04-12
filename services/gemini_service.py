@@ -106,6 +106,96 @@ def estimate_food_nutrition(food_name: str) -> dict:
     return _parse_json(response.text)
 
 
+RECOMMEND_PROMPT = """당신은 다이어트 식단 전문가입니다. 아래 조건에 맞는 식단을 추천해 주세요.
+
+## 사용자 정보
+- 성별: {gender}, 나이: {age}세, 키: {height}cm, 체중: {weight}kg
+- 활동 수준: {activity}
+- 일일 칼로리 목표: {daily_budget}kcal
+- 목표 영양소: 탄수화물 {target_carbs}g, 단백질 {target_protein}g, 지방 {target_fat}g
+
+## 오늘 이미 먹은 음식
+{eaten_summary}
+
+## 남은 칼로리/영양소
+- 남은 칼로리: {remaining_cal}kcal
+- 남은 탄수화물: {remaining_carbs}g, 단백질: {remaining_protein}g, 지방: {remaining_fat}g
+
+## 추천 요청
+{request}
+
+## 응답 형식 (JSON만 반환, 다른 텍스트 없이)
+{{
+  "recommendation": "한 줄 요약 (예: 단백질 보충이 필요한 저녁)",
+  "meals": [
+    {{
+      "meal_type": "아침/점심/저녁",
+      "menu_name": "메뉴 이름 (예: 닭가슴살 샐러드 정식)",
+      "foods": [
+        {{"name": "음식명", "amount": "양", "calories": 숫자, "carbs": 숫자, "protein": 숫자, "fat": 숫자, "quantity": 1.0}}
+      ],
+      "total_cal": 숫자,
+      "reason": "추천 이유 (짧게)"
+    }}
+  ]
+}}
+
+한국인이 실제로 쉽게 먹을 수 있는 현실적인 메뉴를 추천하세요.
+칼로리와 영양소 균형을 맞추고, 남은 영양소를 고려하세요."""
+
+
+def recommend_meals(profile: dict, daily_budget: int,
+                    target_carbs: int, target_protein: int, target_fat: int,
+                    eaten_foods: list[dict],
+                    eaten_cal: float, eaten_carbs: float,
+                    eaten_protein: float, eaten_fat: float) -> dict:
+    """프로필 + 오늘 섭취 현황 기반 식단 추천."""
+
+    if eaten_foods:
+        eaten_summary = "\n".join(
+            f"- {f.get('food_name', f.get('name', ''))} {f.get('amount', '')} "
+            f"({f.get('calories', 0)}kcal, 탄{f.get('carbs', 0)}g 단{f.get('protein', 0)}g 지{f.get('fat', 0)}g)"
+            for f in eaten_foods
+        )
+    else:
+        eaten_summary = "아직 아무것도 먹지 않았습니다."
+
+    remaining_cal = max(daily_budget - eaten_cal, 0)
+    remaining_carbs = max(target_carbs - eaten_carbs, 0)
+    remaining_protein = max(target_protein - eaten_protein, 0)
+    remaining_fat = max(target_fat - eaten_fat, 0)
+
+    # 상황별 요청
+    if eaten_cal == 0:
+        request = "오늘 하루 전체 식단(아침, 점심, 저녁)을 추천해 주세요."
+    elif remaining_cal > daily_budget * 0.5:
+        request = "점심과 저녁 식단을 추천해 주세요. 아침에 먹은 것을 고려해서 균형을 맞춰주세요."
+    else:
+        request = "저녁 식단 1끼를 추천해 주세요. 오늘 먹은 것을 고려해서 남은 칼로리와 영양소에 맞춰주세요."
+
+    prompt = RECOMMEND_PROMPT.format(
+        gender=profile.get("gender", "남성"),
+        age=profile.get("age", 30),
+        height=profile.get("height", 170),
+        weight=profile.get("weight", 70),
+        activity=profile.get("activity_level", "보통활동"),
+        daily_budget=daily_budget,
+        target_carbs=target_carbs,
+        target_protein=target_protein,
+        target_fat=target_fat,
+        eaten_summary=eaten_summary,
+        remaining_cal=round(remaining_cal),
+        remaining_carbs=round(remaining_carbs),
+        remaining_protein=round(remaining_protein),
+        remaining_fat=round(remaining_fat),
+        request=request,
+    )
+
+    client = _get_client()
+    response = client.models.generate_content(model=GEMINI_MODEL, contents=[prompt])
+    return _parse_json(response.text)
+
+
 def estimate_multiple_foods(food_lines: list[str]) -> list[dict]:
     """여러 음식을 한 번에 추정 (Gemini 1회 호출).
 

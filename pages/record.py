@@ -16,7 +16,7 @@ from config import (
     EXERCISE_OPTIONS, WATER_TARGET_ML,
 )
 from services.auth_service import require_auth
-from services.gemini_service import analyze_food_image, estimate_multiple_foods
+from services.gemini_service import analyze_food_image, estimate_multiple_foods, recommend_meals
 from services.calorie_service import calc_bmr, calc_tdee, calc_exercise_plan, calc_daily_deficit
 from services.sheets_service import (
     get_profile, get_meals_for_date, save_meals, delete_meal_row, update_meal_row,
@@ -253,6 +253,80 @@ if t_carbs + t_protein + t_fat > 0:
 else:
     st.caption("오늘 식사 기록이 없습니다.")
 st.markdown('</div>', unsafe_allow_html=True)
+
+# ═══════════════════════════════════════════════════════════════
+# AI 식단 추천
+# ═══════════════════════════════════════════════════════════════
+
+if "recommend_result" not in st.session_state:
+    st.session_state.recommend_result = None
+
+if st.button("🤖 오늘 뭐 먹을까? (AI 추천)", use_container_width=True):
+    # 오늘 먹은 음식 목록
+    saved_today = get_meals_for_date(email, date_str)
+    eaten_list = []
+    e_carbs = e_protein = e_fat = 0.0
+    if not saved_today.empty:
+        for c in ["calories", "carbs", "protein", "fat", "quantity", "total_cal"]:
+            if c in saved_today.columns:
+                saved_today[c] = pd.to_numeric(saved_today[c], errors="coerce").fillna(0)
+        for _, row in saved_today.iterrows():
+            eaten_list.append(row.to_dict())
+        e_carbs = (saved_today["carbs"] * saved_today["quantity"]).sum()
+        e_protein = (saved_today["protein"] * saved_today["quantity"]).sum()
+        e_fat = (saved_today["fat"] * saved_today["quantity"]).sum()
+
+    with st.spinner("AI가 식단을 추천하는 중..."):
+        try:
+            result = recommend_meals(
+                profile=profile, daily_budget=daily_budget,
+                target_carbs=target_carbs, target_protein=target_protein, target_fat=target_fat,
+                eaten_foods=eaten_list,
+                eaten_cal=eaten_cal, eaten_carbs=e_carbs,
+                eaten_protein=e_protein, eaten_fat=e_fat,
+            )
+            st.session_state.recommend_result = result
+        except Exception as e:
+            st.error(f"추천 실패: {e}")
+
+if st.session_state.recommend_result:
+    rec = st.session_state.recommend_result
+    st.markdown(f'<div style="{BOX_STYLE}">', unsafe_allow_html=True)
+    st.markdown(f"#### 🤖 AI 추천: {rec.get('recommendation', '')}")
+
+    for meal in rec.get("meals", []):
+        st.markdown(f"**{meal.get('meal_type', '')} — {meal.get('menu_name', '')}**")
+        st.caption(f"{meal.get('reason', '')} · {meal.get('total_cal', 0):,}kcal")
+
+        for food in meal.get("foods", []):
+            st.markdown(
+                f"&nbsp;&nbsp;· {food.get('name', '')} {food.get('amount', '')} — "
+                f"<span style='color:#94A3B8;'>"
+                f"{food.get('calories', 0)}kcal "
+                f"(탄{food.get('carbs', 0)} 단{food.get('protein', 0)} 지{food.get('fat', 0)})"
+                f"</span>",
+                unsafe_allow_html=True,
+            )
+
+        # 이 식단 추가 버튼
+        meal_foods = meal.get("foods", [])
+        if meal_foods:
+            mt = meal.get("meal_type", "점심")
+            if st.button(
+                f"💾 {mt} 식단 기록에 추가",
+                key=f"rec_add_{mt}",
+                use_container_width=True,
+            ):
+                save_meals(email, date_str, mt, meal_foods)
+                st.session_state.recommend_result = None
+                st.success(f"{mt} {len(meal_foods)}개 음식 저장!")
+                st.rerun()
+
+    if st.button("닫기", key="rec_close"):
+        st.session_state.recommend_result = None
+        st.rerun()
+
+    st.markdown('</div>', unsafe_allow_html=True)
 
 # ═══════════════════════════════════════════════════════════════
 # 3. 통합 입력 폼
