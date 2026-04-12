@@ -170,8 +170,8 @@ with st.form("record_form"):
     st.markdown("---")
     st.markdown("**📝 컨디션 & 메모**")
     cond_index = CONDITION_OPTIONS.index(existing_condition) if existing_condition in CONDITION_OPTIONS else 0
-    memo_condition = st.selectbox("컨디션", CONDITION_OPTIONS, index=cond_index, key="m_cond")
-    memo_text = st.text_input("메모", value=existing_memo_text, placeholder="오늘 식단에 대한 메모", key="m_memo")
+    memo_condition = st.selectbox("컨디션", CONDITION_OPTIONS, index=cond_index, key=f"m_cond_{date_str}")
+    memo_text = st.text_input("메모", value=existing_memo_text, placeholder="오늘 식단에 대한 메모", key=f"m_memo_{date_str}")
 
     submitted = st.form_submit_button(
         "🔍 AI 분석", type="primary", use_container_width=True,
@@ -251,7 +251,12 @@ if submitted:
 # 즐겨찾기 빠른 추가 (폼 바로 아래, 눈에 잘 띄는 위치)
 # ═══════════════════════════════════════════════════════════════
 
+# 즐겨찾기가 비어있으면 기존 식사 기록에서 자동 채움
 favorites = get_favorites(email)
+if not favorites:
+    auto_add_favorites_from_meals(email)
+    favorites = get_favorites(email)
+
 if favorites:
     with st.expander(f"⭐ 자주 먹는 음식 ({len(favorites[:10])}개)", expanded=True):
         for i, fav in enumerate(favorites[:10]):
