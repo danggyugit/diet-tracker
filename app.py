@@ -16,7 +16,7 @@ st.set_page_config(
 
 # 상단 여백 조정 (사이드바 토글 버튼과 pills 겹침 방지)
 st.markdown("""<style>
-.block-container { padding-top:2.5rem !important; }
+.block-container { padding-top:4rem !important; }
 </style>""", unsafe_allow_html=True)
 
 render_sidebar_account()
