@@ -250,28 +250,25 @@ else:
                         st.session_state.editing_key = None
                         st.rerun()
             else:
-                # 표시 모드 — popover로 수정/삭제 (모바일 대응)
-                r1, r2 = st.columns([6, 1])
-                with r1:
-                    st.markdown(
-                        f"**{row['food_name']}** {row.get('amount', '')}  \n"
-                        f"<span style='font-size:13px;color:#94A3B8;'>"
-                        f"{int(row['calories'])}kcal × {row['quantity']}인분 = {int(row['total_cal'])}kcal"
-                        f"</span>",
-                        unsafe_allow_html=True,
+                # 표시 모드
+                st.markdown(
+                    f"**{row['food_name']}** {row.get('amount', '')} · "
+                    f"<span style='color:#94A3B8;'>"
+                    f"{int(row['calories'])}kcal × {row['quantity']}인분 = {int(row['total_cal'])}kcal"
+                    f"</span>",
+                    unsafe_allow_html=True,
+                )
+                bc1, bc2, bc3 = st.columns([1, 1, 4])
+                if bc1.button("수정", key=f"sedit_{row_key}", use_container_width=True):
+                    st.session_state.editing_key = row_key
+                    st.rerun()
+                if bc2.button("삭제", key=f"sdel_{row_key}", use_container_width=True):
+                    delete_meal_row(
+                        email, date_str,
+                        row["food_name"],
+                        str(row.get("created_at", "")),
                     )
-                with r2:
-                    with st.popover("⋯"):
-                        if st.button("✏️ 수정", key=f"sedit_{row_key}", use_container_width=True):
-                            st.session_state.editing_key = row_key
-                            st.rerun()
-                        if st.button("🗑️ 삭제", key=f"sdel_{row_key}", use_container_width=True):
-                            delete_meal_row(
-                                email, date_str,
-                                row["food_name"],
-                                str(row.get("created_at", "")),
-                            )
-                            st.rerun()
+                    st.rerun()
 
 # ─── 메모/컨디션 표시 ────────────────────────────────────────
 saved_memo = get_memo(email, date_str)
