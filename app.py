@@ -14,13 +14,8 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
-# 상단 빈공간 + Fork/GitHub 아이콘 숨기기
+# 상단 빈공간 줄이기 (헤더는 유지 — 사이드바 토글 필요)
 st.markdown("""<style>
-header[data-testid="stHeader"] { display:none !important; }
-div[data-testid="stToolbar"] { display:none !important; }
-div[data-testid="stDecoration"] { display:none !important; }
-.stApp > header { display:none !important; }
-section[data-testid="stSidebar"] > div:first-child { padding-top:1rem; }
 .block-container { padding-top:1rem !important; }
 </style>""", unsafe_allow_html=True)
 
@@ -45,25 +40,17 @@ pg = st.navigation(PAGES, position="sidebar")
 # ─── 상단 네비게이션 바 ──────────────────────────────────────
 if is_logged_in():
     NAV_MAP = {
-        "🍽️": "pages/record.py",
-        "📅": "pages/calendar_view.py",
-        "📊": "pages/trends.py",
-        "👤": "pages/profile.py",
-        "⭐": "pages/favorites.py",
+        "🍽️기록": "pages/record.py",
+        "📅캘린더": "pages/calendar_view.py",
+        "📊트렌드": "pages/trends.py",
+        "👤프로필": "pages/profile.py",
+        "⭐즐찾": "pages/favorites.py",
     }
-    NAV_LABELS = ["기록", "캘린더", "트렌드", "프로필", "즐겨찾기"]
 
     selected = st.pills(
         "nav", list(NAV_MAP.keys()),
         selection_mode="single", default=None,
         label_visibility="collapsed",
-    )
-    # 아이콘 아래 라벨
-    st.markdown(
-        "<div style='display:flex;justify-content:space-around;margin-top:-10px;margin-bottom:8px;'>"
-        + "".join(f"<span style='font-size:10px;color:#64748B;'>{l}</span>" for l in NAV_LABELS)
-        + "</div>",
-        unsafe_allow_html=True,
     )
     if selected:
         st.switch_page(NAV_MAP[selected])
