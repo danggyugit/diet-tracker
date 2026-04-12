@@ -8,7 +8,6 @@ import datetime
 
 import plotly.graph_objects as go
 import streamlit as st
-import streamlit.components.v1 as components
 
 from config import PLOT_CFG, MEAL_TYPES
 from services.auth_service import require_auth
@@ -45,7 +44,6 @@ with col_prev:
             st.session_state.cal_year -= 1
         else:
             st.session_state.cal_month -= 1
-        st.query_params.pop("sel_date", None)
         st.rerun()
 with col_title:
     st.markdown(
@@ -60,7 +58,6 @@ with col_next:
             st.session_state.cal_year += 1
         else:
             st.session_state.cal_month += 1
-        st.query_params.pop("sel_date", None)
         st.rerun()
 
 year = st.session_state.cal_year
@@ -75,10 +72,7 @@ if not totals_df.empty:
     for _, row in totals_df.iterrows():
         daily_map[row["date"]] = int(row["total_cal"])
 
-# ─── 선택된 날짜 (query_params에서 읽기) ─────────────────────
-sel_date = st.query_params.get("sel_date")
-
-# ─── HTML 캘린더 테이블 (클릭 가능) ──────────────────────────
+# ─── HTML 캘린더 테이블 ──────────────────────────────────────
 cal_obj = calendar.Calendar(firstweekday=0)
 weeks = cal_obj.monthdatescalendar(year, month)
 today = datetime.date.today()
@@ -101,22 +95,11 @@ html = """
 <style>
 .cal-table { width:100%; border-collapse:separate; border-spacing:3px; table-layout:fixed; }
 .cal-table th { text-align:center; color:#94A3B8; font-size:13px; font-weight:600; padding:4px 0; }
-.cal-table td { border-radius:8px; padding:4px; vertical-align:top; height:58px; cursor:pointer; transition:opacity 0.15s; }
-.cal-table td:hover { opacity:0.75; }
-.cal-table td.selected { outline:2px solid #3B82F6; outline-offset:-2px; }
+.cal-table td { border-radius:8px; padding:4px; vertical-align:top; height:58px; }
 .cal-day { font-size:11px; color:#94A3B8; }
 .cal-val { font-size:14px; font-weight:600; }
 .cal-unit { font-size:9px; color:#64748B; }
-.cal-empty { cursor:default; }
-.cal-empty:hover { opacity:1; }
 </style>
-<script>
-function selDate(d) {
-    const url = new URL(window.parent.location);
-    url.searchParams.set('sel_date', d);
-    window.parent.location = url;
-}
-</script>
 <table class="cal-table">
 <tr><th>월</th><th>화</th><th>수</th><th>목</th><th>금</th><th>토</th><th>일</th></tr>
 """
@@ -125,20 +108,17 @@ for week in weeks:
     html += "<tr>"
     for day in week:
         if day.month != month:
-            html += "<td class='cal-empty' style='background:transparent;'></td>"
+            html += "<td style='background:transparent;'></td>"
             continue
 
         date_key = day.isoformat()
         cal_val = daily_map.get(date_key, 0)
         bg, text_color = _cell_color(cal_val)
         is_today = day == today
-        is_selected = date_key == sel_date
         border = "2px solid #3B82F6" if is_today else "1px solid rgba(148,163,184,0.15)"
-        selected_cls = " selected" if is_selected else ""
 
         html += (
-            f"<td class='{selected_cls}' onclick=\"selDate('{date_key}')\" "
-            f"style='background:{bg};border:{border};'>"
+            f"<td style='background:{bg};border:{border};'>"
             f"<div class='cal-day'>{day.day}</div>"
             f"<div class='cal-val' style='color:{text_color};'>{cal_val:,}</div>"
             f"<div class='cal-unit'>kcal</div>"
@@ -147,23 +127,30 @@ for week in weeks:
     html += "</tr>"
 
 html += "</table>"
-cal_height = 30 + len(weeks) * 65
-components.html(html, height=cal_height)
+st.markdown(html, unsafe_allow_html=True)
 
 st.caption(
-    f"🟢 목표 이하 · 🟡 목표 근접 · 🔴 목표 초과 (목표: {target:,} kcal) · 날짜를 터치하면 상세 보기"
+    f"🟢 목표 이하 · 🟡 목표 근접 · 🔴 목표 초과 (목표: {target:,} kcal)"
 )
 
 # ═══════════════════════════════════════════════════════════════
-# 드릴다운: 선택된 날짜 상세
+# 드릴다운: 날짜 선택
 # ═══════════════════════════════════════════════════════════════
 
-if sel_date:
-    st.divider()
-    st.subheader(f"📋 {sel_date} 상세")
+st.divider()
+sel_date = st.date_input(
+    "📋 날짜 선택 (상세 보기)",
+    value=today if today.month == month and today.year == year else first_day,
+    min_value=first_day,
+    max_value=last_day,
+)
+sel_date_str = sel_date.isoformat()
 
-    day_meals = get_meals_for_date(email, sel_date)
-    day_memo = get_memo(email, sel_date)
+if sel_date_str:
+    st.subheader(f"📋 {sel_date_str} 상세")
+
+    day_meals = get_meals_for_date(email, sel_date_str)
+    day_memo = get_memo(email, sel_date_str)
 
     # 컨디션 & 메모
     if day_memo:
