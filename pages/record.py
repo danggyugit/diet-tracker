@@ -116,33 +116,46 @@ else:
 if is_below_safety:
     st.caption(f"⚠️ 일일 목표({daily_budget:,})가 안전 권장량({SAFETY_FLOOR:,}) 미만")
 
-# ─── 오늘 영양소 합계 ────────────────────────────────────────
-if not today_totals.empty:
-    t_carbs = float(today_totals.get("total_carbs", [0]).sum()) if "total_carbs" in today_totals.columns else 0
-    t_protein = float(today_totals.get("total_protein", [0]).sum()) if "total_protein" in today_totals.columns else 0
-    t_fat = float(today_totals.get("total_fat", [0]).sum()) if "total_fat" in today_totals.columns else 0
-    total_macro = t_carbs + t_protein + t_fat
-    pct_c = round(t_carbs / total_macro * 100) if total_macro > 0 else 0
-    pct_p = round(t_protein / total_macro * 100) if total_macro > 0 else 0
-    pct_f = round(t_fat / total_macro * 100) if total_macro > 0 else 0
+# ─── 오늘 영양소 (목표 대비 섭취량 바) ────────────────────────
+# 매크로 목표: 탄 50%, 단 30%, 지 20% (1g 탄=4kcal, 단=4kcal, 지=9kcal)
+macro_budget = max(daily_budget, 100)
+target_carbs = round(macro_budget * 0.50 / 4)
+target_protein = round(macro_budget * 0.30 / 4)
+target_fat = round(macro_budget * 0.20 / 9)
 
-    st.markdown(
-        f"<div style='display:flex;gap:8px;justify-content:center;margin:8px 0;'>"
-        f"<div style='flex:1;background:rgba(251,191,36,0.15);border-radius:10px;padding:8px;text-align:center;'>"
-        f"<div style='font-size:20px;'>🍚</div>"
-        f"<div style='font-size:13px;font-weight:700;color:#FBBF24;'>{t_carbs:.0f}g</div>"
-        f"<div style='font-size:10px;color:#94A3B8;'>탄수화물 {pct_c}%</div></div>"
-        f"<div style='flex:1;background:rgba(239,68,68,0.15);border-radius:10px;padding:8px;text-align:center;'>"
-        f"<div style='font-size:20px;'>🥩</div>"
-        f"<div style='font-size:13px;font-weight:700;color:#EF4444;'>{t_protein:.0f}g</div>"
-        f"<div style='font-size:10px;color:#94A3B8;'>단백질 {pct_p}%</div></div>"
-        f"<div style='flex:1;background:rgba(107,114,128,0.15);border-radius:10px;padding:8px;text-align:center;'>"
-        f"<div style='font-size:20px;'>🧈</div>"
-        f"<div style='font-size:13px;font-weight:700;color:#9CA3AF;'>{t_fat:.0f}g</div>"
-        f"<div style='font-size:10px;color:#94A3B8;'>지방 {pct_f}%</div></div>"
-        f"</div>",
-        unsafe_allow_html=True,
+t_carbs = float(today_totals["total_carbs"].sum()) if not today_totals.empty and "total_carbs" in today_totals.columns else 0
+t_protein = float(today_totals["total_protein"].sum()) if not today_totals.empty and "total_protein" in today_totals.columns else 0
+t_fat = float(today_totals["total_fat"].sum()) if not today_totals.empty and "total_fat" in today_totals.columns else 0
+
+
+def _macro_bar(icon, name, current, goal, color):
+    pct = current / goal * 100 if goal > 0 else 0
+    bar_width = min(pct, 100)
+    over = current - goal if current > goal else 0
+    over_width = min(over / goal * 100, 50) if goal > 0 else 0
+    status_color = color if pct <= 100 else "#EF4444"
+    status_text = f"{current:.0f} / {goal}g" if pct <= 100 else f"{current:.0f} / {goal}g (+{over:.0f}g 초과)"
+    return (
+        f"<div style='margin:6px 0;'>"
+        f"<div style='display:flex;align-items:center;gap:6px;margin-bottom:3px;'>"
+        f"<span style='font-size:16px;'>{icon}</span>"
+        f"<span style='font-size:12px;font-weight:600;color:#F8FAFC;'>{name}</span>"
+        f"<span style='font-size:11px;color:{status_color};margin-left:auto;'>{status_text}</span>"
+        f"</div>"
+        f"<div style='background:rgba(30,41,59,0.8);border-radius:6px;height:14px;position:relative;overflow:hidden;'>"
+        f"<div style='width:{bar_width}%;height:100%;background:{color};border-radius:6px;'></div>"
+        f"{'<div style=\"position:absolute;top:0;left:' + str(bar_width) + '%;width:' + str(over_width) + '%;height:100%;background:#EF4444;border-radius:0 6px 6px 0;\"></div>' if over > 0 else ''}"
+        f"</div></div>"
     )
+
+
+st.markdown(
+    _macro_bar("🍚", "탄수화물", t_carbs, target_carbs, "#FBBF24")
+    + _macro_bar("🥩", "단백질", t_protein, target_protein, "#3B82F6")
+    + _macro_bar("🧈", "지방", t_fat, target_fat, "#8B5CF6"),
+    unsafe_allow_html=True,
+)
+st.caption(f"목표 비율 — 탄 50% ({target_carbs}g) · 단 30% ({target_protein}g) · 지 20% ({target_fat}g)")
 
 # ═══════════════════════════════════════════════════════════════
 # 3. 통합 입력 폼
