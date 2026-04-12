@@ -203,6 +203,12 @@ if saved.empty:
     st.caption(f"{date_str} 저장된 기록이 없습니다.")
 else:
     st.markdown(f"#### 📋 {date_str} 저장된 기록")
+    # 저장 기록 행이 전체 너비로 늘어나지 않도록 제한
+    st.markdown("""<style>
+    div.saved-row [data-testid="stHorizontalBlock"] {
+        max-width: 500px !important;
+    }
+    </style>""", unsafe_allow_html=True)
 
     for c in ["calories", "carbs", "protein", "fat", "quantity", "total_cal"]:
         if c in saved.columns:
@@ -250,25 +256,28 @@ else:
                         st.session_state.editing_key = None
                         st.rerun()
             else:
-                # 표시 모드 — 음식명 | 수정 | 삭제 한 줄
-                rc1, rc2, rc3 = st.columns([6, 1, 1], gap="small")
-                rc1.markdown(
-                    f"**{row['food_name']}** {row.get('amount', '')}  \n"
-                    f"<span style='font-size:12px;color:#94A3B8;'>"
-                    f"{int(row['calories'])}×{row['quantity']}={int(row['total_cal'])}kcal"
-                    f"</span>",
-                    unsafe_allow_html=True,
-                )
-                if rc2.button("수정", key=f"sedit_{row_key}"):
-                    st.session_state.editing_key = row_key
-                    st.rerun()
-                if rc3.button("삭제", key=f"sdel_{row_key}"):
-                    delete_meal_row(
-                        email, date_str,
-                        row["food_name"],
-                        str(row.get("created_at", "")),
+                # 표시 모드 — 음식명 | 수정 | 삭제 한 줄 (max-width 제한)
+                with st.container():
+                    st.markdown('<div class="saved-row">', unsafe_allow_html=True)
+                    rc1, rc2, rc3 = st.columns([3, 1, 1], gap="small")
+                    rc1.markdown(
+                        f"**{row['food_name']}** {row.get('amount', '')}  \n"
+                        f"<span style='font-size:12px;color:#94A3B8;'>"
+                        f"{int(row['calories'])}×{row['quantity']}={int(row['total_cal'])}kcal"
+                        f"</span>",
+                        unsafe_allow_html=True,
                     )
-                    st.rerun()
+                    if rc2.button("수정", key=f"sedit_{row_key}"):
+                        st.session_state.editing_key = row_key
+                        st.rerun()
+                    if rc3.button("삭제", key=f"sdel_{row_key}"):
+                        delete_meal_row(
+                            email, date_str,
+                            row["food_name"],
+                            str(row.get("created_at", "")),
+                        )
+                        st.rerun()
+                    st.markdown('</div>', unsafe_allow_html=True)
 
 # ─── 메모/컨디션 표시 ────────────────────────────────────────
 saved_memo = get_memo(email, date_str)
