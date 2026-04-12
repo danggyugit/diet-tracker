@@ -250,8 +250,8 @@ else:
                         st.session_state.editing_key = None
                         st.rerun()
             else:
-                # 표시 모드
-                r1, r2, r3 = st.columns([5, 1, 1])
+                # 표시 모드 — popover로 수정/삭제 (모바일 대응)
+                r1, r2 = st.columns([6, 1])
                 with r1:
                     st.markdown(
                         f"**{row['food_name']}** {row.get('amount', '')}  \n"
@@ -261,17 +261,17 @@ else:
                         unsafe_allow_html=True,
                     )
                 with r2:
-                    if st.button("수정", key=f"sedit_{row_key}"):
-                        st.session_state.editing_key = row_key
-                        st.rerun()
-                with r3:
-                    if st.button("삭제", key=f"sdel_{row_key}"):
-                        delete_meal_row(
-                            email, date_str,
-                            row["food_name"],
-                            str(row.get("created_at", "")),
-                        )
-                        st.rerun()
+                    with st.popover("⋯"):
+                        if st.button("✏️ 수정", key=f"sedit_{row_key}", use_container_width=True):
+                            st.session_state.editing_key = row_key
+                            st.rerun()
+                        if st.button("🗑️ 삭제", key=f"sdel_{row_key}", use_container_width=True):
+                            delete_meal_row(
+                                email, date_str,
+                                row["food_name"],
+                                str(row.get("created_at", "")),
+                            )
+                            st.rerun()
 
 # ─── 메모/컨디션 표시 ────────────────────────────────────────
 saved_memo = get_memo(email, date_str)
