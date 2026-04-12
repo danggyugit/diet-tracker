@@ -14,13 +14,16 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# PWA 메타 태그 — 모바일 홈 화면 추가 시 앱처럼 동작
+# PWA 메타 태그 + manifest + apple-touch-icon
 st.markdown("""
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="식단트래커">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#0F172A">
+<link rel="manifest" href="/app/static/manifest.json">
+<link rel="apple-touch-icon" sizes="192x192" href="/app/static/icon-192.png">
+<link rel="apple-touch-icon" sizes="512x512" href="/app/static/icon-512.png">
 """, unsafe_allow_html=True)
 
 render_sidebar_account()
