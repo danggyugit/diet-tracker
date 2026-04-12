@@ -32,22 +32,30 @@ PAGES = {
 
 pg = st.navigation(PAGES, position="sidebar")
 
-# ─── 상단 네비게이션 바 (st.pills) ──────────────────────────
+# ─── 상단 네비게이션 바 ──────────────────────────────────────
 if is_logged_in():
-    NAV_OPTIONS = {
-        "🍽️ 기록": "pages/record.py",
-        "📅 캘린더": "pages/calendar_view.py",
-        "📊 트렌드": "pages/trends.py",
-        "👤 프로필": "pages/profile.py",
-        "⭐ 즐겨찾기": "pages/favorites.py",
+    NAV_MAP = {
+        "🍽️": "pages/record.py",
+        "📅": "pages/calendar_view.py",
+        "📊": "pages/trends.py",
+        "👤": "pages/profile.py",
+        "⭐": "pages/favorites.py",
     }
+    NAV_LABELS = ["기록", "캘린더", "트렌드", "프로필", "즐겨찾기"]
+
     selected = st.pills(
-        "nav", list(NAV_OPTIONS.keys()),
-        selection_mode="single",
-        default=None,
+        "nav", list(NAV_MAP.keys()),
+        selection_mode="single", default=None,
         label_visibility="collapsed",
     )
-    if selected and NAV_OPTIONS[selected] != pg.url_path:
-        st.switch_page(NAV_OPTIONS[selected])
+    # 아이콘 아래 라벨
+    st.markdown(
+        "<div style='display:flex;justify-content:space-around;margin-top:-10px;margin-bottom:8px;'>"
+        + "".join(f"<span style='font-size:10px;color:#64748B;'>{l}</span>" for l in NAV_LABELS)
+        + "</div>",
+        unsafe_allow_html=True,
+    )
+    if selected:
+        st.switch_page(NAV_MAP[selected])
 
 pg.run()
