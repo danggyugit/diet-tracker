@@ -23,6 +23,7 @@ from services.sheets_service import (
     get_latest_weight, save_weight, get_daily_totals,
     save_memo, get_memo,
     save_exercise, get_daily_burned, get_exercise_log,
+    delete_exercise_row, update_exercise_row,
     save_water, get_water_log, reset_water,
     get_favorites, add_favorite,
 )
@@ -34,6 +35,8 @@ if "pending_foods" not in st.session_state:
     st.session_state.pending_foods = []
 if "editing_key" not in st.session_state:
     st.session_state.editing_key = None
+if "editing_ex_key" not in st.session_state:
+    st.session_state.editing_ex_key = None
 
 # ─── 프로필 + TDEE ───────────────────────────────────────────
 profile = get_profile(email) or {}
@@ -351,12 +354,48 @@ else:
                     delete_meal_row(email, date_str, row["food_name"], str(row.get("created_at", "")))
                     st.rerun()
 
-# ─── 운동 기록 표시 ──────────────────────────────────────────
+# ─── 운동 기록 표시 (수정/삭제) ─────────────────────────────
 ex_log = get_exercise_log(email, date_str, date_str)
 if not ex_log.empty:
     st.markdown(f"**🏃 운동 기록** ({burned_cal:,.0f} kcal 소모)")
-    for _, ex in ex_log.iterrows():
-        st.caption(f"  · {ex['exercise_name']} {int(ex['duration_min'])}분 — {int(ex['calories_burned'])}kcal")
+    for ex_idx, ex in ex_log.iterrows():
+        ex_key = f"ex_{ex_idx}"
+        is_ex_editing = st.session_state.editing_ex_key == ex_key
+
+        if is_ex_editing:
+            with st.form(f"edit_ex_{ex_key}"):
+                st.markdown(f"**{ex['exercise_name']}** 수정")
+                new_dur = st.number_input(
+                    "시간 (분)", value=int(ex["duration_min"]),
+                    min_value=5, max_value=300, step=5, key=f"exed_{ex_key}",
+                )
+                ebc1, ebc2 = st.columns(2)
+                if ebc1.form_submit_button("저장", use_container_width=True):
+                    update_exercise_row(
+                        email, date_str, ex["exercise_name"],
+                        str(ex.get("created_at", "")), new_dur, latest_weight,
+                    )
+                    st.session_state.editing_ex_key = None
+                    st.rerun()
+                if ebc2.form_submit_button("취소", use_container_width=True):
+                    st.session_state.editing_ex_key = None
+                    st.rerun()
+        else:
+            st.markdown(
+                f"**{ex['exercise_name']}** {int(ex['duration_min'])}분 · "
+                f"<span style='color:#94A3B8;'>{int(ex['calories_burned'])}kcal</span>",
+                unsafe_allow_html=True,
+            )
+            ebc1, ebc2, ebc3 = st.columns([1, 1, 4])
+            if ebc1.button("수정", key=f"exedit_{ex_key}", use_container_width=True):
+                st.session_state.editing_ex_key = ex_key
+                st.rerun()
+            if ebc2.button("삭제", key=f"exdel_{ex_key}", use_container_width=True):
+                delete_exercise_row(
+                    email, date_str, ex["exercise_name"],
+                    str(ex.get("created_at", "")),
+                )
+                st.rerun()
 
 # ─── 물 섭취 표시 ────────────────────────────────────────────
 total_water = get_water_log(email, date_str)

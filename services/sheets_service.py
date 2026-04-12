@@ -312,6 +312,39 @@ def save_exercise(email: str, date: str, name: str, duration: int, met: float, w
     get_exercise_log.clear()
 
 
+def delete_exercise_row(email: str, date: str, exercise_name: str, created_at: str) -> bool:
+    ws = _get_worksheet(WS_EXERCISE_LOG)
+    _ensure_headers(ws, EXERCISE_LOG_HEADERS)
+    records = ws.get_all_records()
+    for i, r in enumerate(records):
+        if (r.get("email") == email and r.get("date") == date
+                and r.get("exercise_name") == exercise_name
+                and str(r.get("created_at", "")) == str(created_at)):
+            ws.delete_rows(i + 2)
+            get_exercise_log.clear()
+            return True
+    return False
+
+
+def update_exercise_row(email: str, date: str, exercise_name: str, created_at: str,
+                        new_duration: int, weight: float) -> bool:
+    ws = _get_worksheet(WS_EXERCISE_LOG)
+    _ensure_headers(ws, EXERCISE_LOG_HEADERS)
+    records = ws.get_all_records()
+    for i, r in enumerate(records):
+        if (r.get("email") == email and r.get("date") == date
+                and r.get("exercise_name") == exercise_name
+                and str(r.get("created_at", "")) == str(created_at)):
+            row_num = i + 2
+            met = float(r.get("met", 5))
+            new_cal = round(met * weight * new_duration / 60)
+            ws.update(f"D{row_num}", [[new_duration]])
+            ws.update(f"F{row_num}", [[new_cal]])
+            get_exercise_log.clear()
+            return True
+    return False
+
+
 @st.cache_data(ttl=300)
 def get_exercise_log(_email: str, start_date: str, end_date: str) -> pd.DataFrame:
     ws = _get_worksheet(WS_EXERCISE_LOG)

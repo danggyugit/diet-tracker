@@ -27,7 +27,7 @@ render_sidebar_account()
 
 PAGES = {
     "기록": [
-        st.Page("pages/record.py", title="식단 기록", icon=":material/restaurant:"),
+        st.Page("pages/record.py", title="식단 및 운동 기록", icon=":material/restaurant:"),
     ],
     "분석": [
         st.Page("pages/calendar_view.py", title="캘린더", icon=":material/calendar_month:"),
