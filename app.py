@@ -32,14 +32,25 @@ PAGES = {
 
 pg = st.navigation(PAGES, position="sidebar")
 
-# ─── 상단 네비게이션 바 ──────────────────────────────────────
+# ─── 상단 네비게이션 바 (아이콘만, HTML로 가로 고정) ─────────
 if is_logged_in():
-    nav_cols = st.columns(5, gap="small")
-    nav_cols[0].page_link("pages/record.py", label="기록", icon="🍽️", use_container_width=True)
-    nav_cols[1].page_link("pages/calendar_view.py", label="캘린더", icon="📅", use_container_width=True)
-    nav_cols[2].page_link("pages/trends.py", label="트렌드", icon="📊", use_container_width=True)
-    nav_cols[3].page_link("pages/profile.py", label="프로필", icon="👤", use_container_width=True)
-    nav_cols[4].page_link("pages/favorites.py", label="즐겨찾기", icon="⭐", use_container_width=True)
-    st.divider()
+    st.markdown("""
+    <style>
+    .nav-bar { display:flex; justify-content:center; gap:4px; padding:4px 0; }
+    .nav-bar a {
+        text-decoration:none; font-size:24px; padding:6px 14px;
+        border-radius:10px; background:rgba(30,41,59,0.6);
+        transition: background 0.15s;
+    }
+    .nav-bar a:hover { background:rgba(59,130,246,0.3); }
+    </style>
+    <div class="nav-bar">
+        <a href="/식단_및_운동_기록" target="_self" title="식단 및 운동 기록">🍽️</a>
+        <a href="/캘린더" target="_self" title="캘린더">📅</a>
+        <a href="/트렌드" target="_self" title="트렌드">📊</a>
+        <a href="/프로필" target="_self" title="프로필">👤</a>
+        <a href="/즐겨찾기" target="_self" title="즐겨찾기">⭐</a>
+    </div>
+    """, unsafe_allow_html=True)
 
 pg.run()
