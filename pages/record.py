@@ -1,8 +1,8 @@
 """📸 식단 기록 페이지.
 
 모바일 단일 컬럼 레이아웃:
-날짜 → 게이지(순칼로리) → 체중 → 식사유형 → 사진(2단계) → 수동추가 → 즐겨찾기
-→ 운동기록 → 물섭취 → 컨디션/메모 → [저장] → 저장된기록
+날짜 → 게이지(순칼로리) → [폼: 체중·식사유형·사진·수동추가·즐겨찾기·운동·물·메모]
+→ 2단계 확인 → 저장된기록
 """
 
 import datetime
@@ -24,7 +24,7 @@ from services.sheets_service import (
     save_memo, get_memo,
     save_exercise, get_daily_burned, get_exercise_log,
     save_water, get_water_log, reset_water,
-    get_favorites, add_favorite, auto_add_favorites_from_meals,
+    get_favorites, add_favorite,
 )
 
 email = require_auth()
@@ -70,7 +70,7 @@ selected_date = st.date_input("날짜", value=datetime.date.today())
 date_str = selected_date.isoformat()
 
 # ═══════════════════════════════════════════════════════════════
-# 2. 순 칼로리 게이지 (섭취 - 운동 소모)
+# 2. 순 칼로리 게이지
 # ═══════════════════════════════════════════════════════════════
 
 today_totals = get_daily_totals(email, date_str, date_str)
@@ -121,6 +121,10 @@ existing_memo = get_memo(email, date_str)
 existing_condition = existing_memo.get("condition", "") if existing_memo else ""
 existing_memo_text = existing_memo.get("memo", "") if existing_memo else ""
 
+# 즐겨찾기 목록 (폼 안 multiselect용)
+favorites = get_favorites(email)
+fav_names = [f"{f['food_name']} ({f.get('calories', 0)}kcal)" for f in favorites] if favorites else []
+
 with st.form("record_form"):
     # 체중
     today_weight = st.number_input(
@@ -148,6 +152,19 @@ with st.form("record_form"):
         height=100, key="m_text", label_visibility="collapsed",
     )
 
+    # 즐겨찾기 선택
+    st.markdown("---")
+    st.markdown("**⭐ 즐겨찾기에서 선택**")
+    if fav_names:
+        selected_favs = st.multiselect(
+            "음식 선택 (복수 가능)",
+            fav_names,
+            key="fav_select", label_visibility="collapsed",
+        )
+    else:
+        st.caption("즐겨찾기가 비어있습니다. 설정 > 즐겨찾기에서 등록하세요.")
+        selected_favs = []
+
     # 운동 기록
     st.markdown("---")
     st.markdown("**🏃 운동 기록**")
@@ -174,11 +191,11 @@ with st.form("record_form"):
     memo_text = st.text_input("메모", value=existing_memo_text, placeholder="오늘 식단에 대한 메모", key=f"m_memo_{date_str}")
 
     submitted = st.form_submit_button(
-        "🔍 AI 분석", type="primary", use_container_width=True,
+        "🔍 AI 분석 및 저장", type="primary", use_container_width=True,
     )
 
 # ═══════════════════════════════════════════════════════════════
-# 폼 제출 → 2단계: 결과 확인
+# 폼 제출 처리
 # ═══════════════════════════════════════════════════════════════
 
 if submitted:
@@ -217,6 +234,22 @@ if submitted:
             except Exception as e:
                 st.error(f"추정 실패: {e}")
 
+    # 즐겨찾기 선택 음식
+    if selected_favs:
+        for sel_name in selected_favs:
+            for fav in favorites:
+                display = f"{fav['food_name']} ({fav.get('calories', 0)}kcal)"
+                if display == sel_name:
+                    pending.append({
+                        "name": fav["food_name"], "amount": fav.get("amount", ""),
+                        "calories": int(fav.get("calories", 0)),
+                        "carbs": int(fav.get("carbs", 0)),
+                        "protein": int(fav.get("protein", 0)),
+                        "fat": int(fav.get("fat", 0)),
+                        "quantity": 1.0, "source": "favorite",
+                    })
+                    break
+
     # 체중 저장 (항상)
     save_weight(email, date_str, today_weight)
 
@@ -237,46 +270,13 @@ if submitted:
     if memo_text.strip() or memo_condition:
         save_memo(email, date_str, memo_condition, memo_text.strip())
 
-    # 음식이 있으면 세션에 저장 (2단계 확인용)
+    # 음식이 있으면 2단계 확인, 없으면 바로 완료
     if pending:
         st.session_state.pending_foods = pending
         st.rerun()
-    elif not pending and not uploaded and not food_lines:
+    else:
         st.success(f"💾 체중 {today_weight}kg 기록 완료!")
         st.rerun()
-    else:
-        st.rerun()
-
-# ═══════════════════════════════════════════════════════════════
-# 즐겨찾기 빠른 추가 (폼 바로 아래, 눈에 잘 띄는 위치)
-# ═══════════════════════════════════════════════════════════════
-
-# 즐겨찾기가 비어있으면 기존 식사 기록에서 자동 채움
-favorites = get_favorites(email)
-if not favorites:
-    auto_add_favorites_from_meals(email)
-    favorites = get_favorites(email)
-
-if favorites:
-    with st.expander(f"⭐ 자주 먹는 음식 ({len(favorites[:10])}개)", expanded=False):
-        for i, fav in enumerate(favorites[:10]):
-            fc1, fc2 = st.columns([4, 1])
-            fc1.markdown(
-                f"**{fav['food_name']}** · "
-                f"<span style='color:#94A3B8;font-size:13px;'>{fav.get('calories', 0)}kcal</span>",
-                unsafe_allow_html=True,
-            )
-            if fc2.button("추가", key=f"fav_{i}", use_container_width=True):
-                save_meals(email, date_str, meal_type, [{
-                    "name": fav["food_name"], "amount": fav.get("amount", ""),
-                    "calories": int(fav.get("calories", 0)),
-                    "carbs": int(fav.get("carbs", 0)),
-                    "protein": int(fav.get("protein", 0)),
-                    "fat": int(fav.get("fat", 0)),
-                    "quantity": 1.0, "source": "favorite",
-                }])
-                st.success(f"⭐ {fav['food_name']} 추가!")
-                st.rerun()
 
 # ═══════════════════════════════════════════════════════════════
 # 2단계: 분석 결과 확인 → 수정 → 저장
@@ -292,7 +292,7 @@ if st.session_state.pending_foods:
     with st.form("confirm_form"):
         edited_foods = []
         for i, food in enumerate(foods):
-            badge = "🤖" if food.get("source") == "ai" else "✏️"
+            badge = {"ai": "🤖", "manual": "✏️", "favorite": "⭐"}.get(food.get("source"), "🤖")
             st.markdown(f"**{badge} {food.get('name', '')}** {food.get('amount', '')}")
             c1, c2, c3, c4, c5 = st.columns(5)
             e_cal = c1.number_input("kcal", value=int(food.get("calories", 0)), min_value=0, key=f"pc_{i}")
@@ -317,9 +317,6 @@ if st.session_state.pending_foods:
 
     if save_btn:
         save_meals(email, date_str, meal_type, edited_foods)
-        # 즐겨찾기에 자동 추가
-        for f in edited_foods:
-            add_favorite(email, f)
         st.session_state.pending_foods = []
         st.success(f"💾 {meal_type} {len(edited_foods)}개 음식 저장!")
         st.rerun()
