@@ -41,13 +41,17 @@ target_cal = int(profile.get("target_calories", 0))
 target_wt = float(profile.get("target_weight", 0))
 target_dt = profile.get("target_date", "")
 
+SAFETY_FLOOR = 1200
+
 if target_cal > 0:
     daily_budget = target_cal
 elif target_wt > 0 and target_dt:
     deficit = calc_daily_deficit(latest_weight, target_wt, target_dt)
-    daily_budget = max(round(tdee - deficit["deficit_per_day"]), 1200)
+    daily_budget = round(tdee - deficit["deficit_per_day"])
 else:
     daily_budget = round(tdee)
+
+is_below_safety = daily_budget < SAFETY_FLOOR
 
 # ═══════════════════════════════════════════════════════════════
 # 1. 날짜
@@ -89,6 +93,8 @@ fig_budget = go.Figure(go.Indicator(
 fig_budget.update_layout(**PLOT_CFG, height=180, margin=dict(l=15, r=15, t=45, b=0))
 st.plotly_chart(fig_budget, use_container_width=True)
 st.caption(status)
+if is_below_safety:
+    st.warning(f"⚠️ 목표 예산({daily_budget:,}kcal)이 안전 하한선({SAFETY_FLOOR:,}kcal) 미만입니다. 극단적 칼로리 제한은 근손실·영양결핍 위험이 있으니 주의하세요.")
 
 # ═══════════════════════════════════════════════════════════════
 # 3. 통합 입력 폼 (체중 + 식사유형 + 사진 + 수동음식)
