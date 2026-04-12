@@ -39,19 +39,18 @@ pg = st.navigation(PAGES, position="sidebar")
 
 # ─── 상단 네비게이션 바 ──────────────────────────────────────
 if is_logged_in():
-    NAV_MAP = {
-        "  🍽️  ": "pages/record.py",
-        "  📅  ": "pages/calendar_view.py",
-        "  📊  ": "pages/trends.py",
-        "  👤  ": "pages/profile.py",
-        "  ⭐  ": "pages/favorites.py",
-    }
-    selected = st.pills(
-        "nav", list(NAV_MAP.keys()),
-        selection_mode="single", default=None,
+    NAV_OPTIONS = ["🍽️기록", "📅캘린더", "📊트렌드", "👤프로필", "⭐즐찾"]
+    NAV_PAGES = [
+        "pages/record.py", "pages/calendar_view.py",
+        "pages/trends.py", "pages/profile.py", "pages/favorites.py",
+    ]
+    selected = st.radio(
+        "nav", NAV_OPTIONS,
+        horizontal=True,
         label_visibility="collapsed",
+        key="nav_radio",
     )
-    if selected:
-        st.switch_page(NAV_MAP[selected])
+    idx = NAV_OPTIONS.index(selected)
+    st.switch_page(NAV_PAGES[idx])
 
 pg.run()
