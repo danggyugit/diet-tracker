@@ -14,6 +14,16 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
+# 상단 빈공간 + Fork/GitHub 아이콘 숨기기
+st.markdown("""<style>
+header[data-testid="stHeader"] { display:none !important; }
+div[data-testid="stToolbar"] { display:none !important; }
+div[data-testid="stDecoration"] { display:none !important; }
+.stApp > header { display:none !important; }
+section[data-testid="stSidebar"] > div:first-child { padding-top:1rem; }
+.block-container { padding-top:1rem !important; }
+</style>""", unsafe_allow_html=True)
+
 render_sidebar_account()
 
 PAGES = {
