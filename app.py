@@ -39,51 +39,16 @@ pg = st.navigation(PAGES, position="sidebar")
 
 # ─── 상단 네비게이션 바 ──────────────────────────────────────
 if is_logged_in():
-    NAV_MAP = {
-        "🍽️": "pages/record.py",
-        "📅": "pages/calendar_view.py",
-        "📊": "pages/trends.py",
-        "👤": "pages/profile.py",
-        "⭐": "pages/favorites.py",
-    }
-
-    # pills 스타일: 전체 너비 균등 분배
-    st.markdown("""<style>
-    /* pills 컨테이너를 전체 너비로 */
-    div[data-testid="stPills"] > div {
-        width:100% !important;
-        display:flex !important;
-        gap:6px !important;
-    }
-    /* 각 pill 버튼을 균등 크기로 */
-    div[data-testid="stPills"] button {
-        flex:1 !important;
-        font-size:24px !important;
-        padding:10px 0 !important;
-        border-radius:12px !important;
-        border:1px solid rgba(148,163,184,0.15) !important;
-        background:rgba(30,41,59,0.5) !important;
-        justify-content:center !important;
-        transition: all 0.2s !important;
-    }
-    div[data-testid="stPills"] button:hover {
-        background:rgba(59,130,246,0.2) !important;
-        border-color:rgba(59,130,246,0.4) !important;
-    }
-    /* 선택된 pill */
-    div[data-testid="stPills"] button[aria-checked="true"] {
-        background:rgba(59,130,246,0.25) !important;
-        border-color:#3B82F6 !important;
-        box-shadow:0 0 10px rgba(59,130,246,0.25) !important;
-    }
-    </style>""", unsafe_allow_html=True)
-
-    selected = st.pills(
-        "nav", list(NAV_MAP.keys()),
-        selection_mode="single", default=None,
-        label_visibility="collapsed",
-    )
-    if selected:
-        st.switch_page(NAV_MAP[selected])
+    NAV_ITEMS = [
+        ("🍽️", "기록", "pages/record.py"),
+        ("📅", "캘린더", "pages/calendar_view.py"),
+        ("📊", "트렌드", "pages/trends.py"),
+        ("👤", "프로필", "pages/profile.py"),
+        ("⭐", "즐겨찾기", "pages/favorites.py"),
+    ]
+    nc = st.columns(5, gap="small")
+    for i, (icon, label, page) in enumerate(NAV_ITEMS):
+        if nc[i].button(icon, key=f"nav_{i}", use_container_width=True, help=label):
+            st.switch_page(page)
 
 pg.run()
