@@ -270,59 +270,14 @@ if submitted:
     if memo_text.strip() or memo_condition:
         save_memo(email, date_str, memo_condition, memo_text.strip())
 
-    # 음식이 있으면 2단계 확인, 없으면 바로 완료
+    # 음식 바로 저장
     if pending:
-        st.session_state.pending_foods = pending
-        st.rerun()
+        save_meals(email, date_str, meal_type, pending)
+        total = sum(f.get("calories", 0) * f.get("quantity", 1) for f in pending)
+        st.success(f"💾 {meal_type} {len(pending)}개 음식 ({total:,.0f}kcal) + 체중 {today_weight}kg 저장!")
     else:
         st.success(f"💾 체중 {today_weight}kg 기록 완료!")
-        st.rerun()
-
-# ═══════════════════════════════════════════════════════════════
-# 2단계: 분석 결과 확인 → 수정 → 저장
-# ═══════════════════════════════════════════════════════════════
-
-if st.session_state.pending_foods:
-    st.divider()
-    st.markdown("#### 🔍 분석 결과 (수정 후 저장하세요)")
-
-    foods = st.session_state.pending_foods
-    total_pending = 0
-
-    with st.form("confirm_form"):
-        edited_foods = []
-        for i, food in enumerate(foods):
-            badge = {"ai": "🤖", "manual": "✏️", "favorite": "⭐"}.get(food.get("source"), "🤖")
-            st.markdown(f"**{badge} {food.get('name', '')}** {food.get('amount', '')}")
-            c1, c2, c3, c4, c5 = st.columns(5)
-            e_cal = c1.number_input("kcal", value=int(food.get("calories", 0)), min_value=0, key=f"pc_{i}")
-            e_carbs = c2.number_input("탄(g)", value=int(food.get("carbs", 0)), min_value=0, key=f"pcb_{i}")
-            e_prot = c3.number_input("단(g)", value=int(food.get("protein", 0)), min_value=0, key=f"pp_{i}")
-            e_fat = c4.number_input("지(g)", value=int(food.get("fat", 0)), min_value=0, key=f"pf_{i}")
-            e_qty = c5.number_input("인분", value=float(food.get("quantity", 1.0)), min_value=0.5, max_value=10.0, step=0.5, key=f"pq_{i}")
-            edited_foods.append({
-                "name": food.get("name", ""),
-                "amount": food.get("amount", ""),
-                "calories": e_cal, "carbs": e_carbs,
-                "protein": e_prot, "fat": e_fat,
-                "quantity": e_qty, "source": food.get("source", "ai"),
-            })
-            total_pending += e_cal * e_qty
-
-        st.markdown(f"**총 {total_pending:,.0f} kcal**")
-
-        col_save, col_cancel = st.columns(2)
-        save_btn = col_save.form_submit_button("💾 저장", type="primary", use_container_width=True)
-        cancel_btn = col_cancel.form_submit_button("취소", use_container_width=True)
-
-    if save_btn:
-        save_meals(email, date_str, meal_type, edited_foods)
-        st.session_state.pending_foods = []
-        st.success(f"💾 {meal_type} {len(edited_foods)}개 음식 저장!")
-        st.rerun()
-    if cancel_btn:
-        st.session_state.pending_foods = []
-        st.rerun()
+    st.rerun()
 
 # ═══════════════════════════════════════════════════════════════
 # 저장된 기록
