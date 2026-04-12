@@ -95,10 +95,14 @@ fig_budget = go.Figure(go.Indicator(
     value=net_cal,
     gauge=dict(
         axis=dict(range=[0, gauge_max], tickfont=dict(size=10)),
-        bar=dict(color=bar_color),
+        bar=dict(color=bar_color, thickness=0.3),
         steps=[
-            dict(range=[0, daily_budget], color="rgba(34,197,94,0.15)"),
-            dict(range=[daily_budget, gauge_max], color="rgba(239,68,68,0.15)"),
+            dict(range=[0, daily_budget * 0.3], color="rgba(34,197,94,0.6)"),
+            dict(range=[daily_budget * 0.3, daily_budget * 0.6], color="rgba(34,197,94,0.4)"),
+            dict(range=[daily_budget * 0.6, daily_budget * 0.85], color="rgba(250,204,21,0.35)"),
+            dict(range=[daily_budget * 0.85, daily_budget], color="rgba(251,146,60,0.4)"),
+            dict(range=[daily_budget, daily_budget * 1.1], color="rgba(239,68,68,0.4)"),
+            dict(range=[daily_budget * 1.1, gauge_max], color="rgba(239,68,68,0.6)"),
         ],
         threshold=dict(line=dict(color="#F8FAFC", width=2), value=daily_budget),
     ),
@@ -183,9 +187,9 @@ def _mini_donut(current, goal, color, bg_color):
 
 if t_carbs + t_protein + t_fat > 0:
     macros = [
-        ("🍚 탄수화물", t_carbs, target_carbs, "#FBBF24"),
+        ("🍚 탄수화물", t_carbs, target_carbs, "#22C55E"),
         ("🥩 단백질", t_protein, target_protein, "#3B82F6"),
-        ("🧈 지방", t_fat, target_fat, "#8B5CF6"),
+        ("🧈 지방", t_fat, target_fat, "#F59E0B"),
     ]
     # Plotly subplots로 도넛 3개를 하나의 차트에 (모바일 가로 유지)
     from plotly.subplots import make_subplots
