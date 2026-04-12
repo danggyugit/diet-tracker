@@ -251,7 +251,7 @@ else:
                         st.rerun()
             else:
                 # 표시 모드 — 음식명 | 수정 | 삭제 한 줄
-                rc1, rc2, rc3 = st.columns([4, 1, 1])
+                rc1, rc2, rc3 = st.columns([6, 1, 1], gap="small")
                 rc1.markdown(
                     f"**{row['food_name']}** {row.get('amount', '')}  \n"
                     f"<span style='font-size:12px;color:#94A3B8;'>"
