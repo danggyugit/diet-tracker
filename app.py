@@ -40,12 +40,38 @@ pg = st.navigation(PAGES, position="sidebar")
 # ─── 상단 네비게이션 바 ──────────────────────────────────────
 if is_logged_in():
     NAV_MAP = {
-        "🍽️기록": "pages/record.py",
-        "📅캘린더": "pages/calendar_view.py",
-        "📊트렌드": "pages/trends.py",
-        "👤프로필": "pages/profile.py",
-        "⭐즐찾": "pages/favorites.py",
+        "🍽️": "pages/record.py",
+        "📅": "pages/calendar_view.py",
+        "📊": "pages/trends.py",
+        "👤": "pages/profile.py",
+        "⭐": "pages/favorites.py",
     }
+
+    # pills 스타일 커스텀
+    st.markdown("""<style>
+    /* pills 컨테이너 가운데 정렬 */
+    div[data-testid="stPills"] { justify-content:center; }
+    /* 각 pill 버튼 */
+    div[data-testid="stPills"] button {
+        font-size:22px !important;
+        padding:8px 16px !important;
+        border-radius:14px !important;
+        border:1px solid rgba(148,163,184,0.2) !important;
+        background:rgba(30,41,59,0.6) !important;
+        transition: all 0.2s !important;
+    }
+    div[data-testid="stPills"] button:hover {
+        background:rgba(59,130,246,0.2) !important;
+        border-color:rgba(59,130,246,0.4) !important;
+        transform:scale(1.1) !important;
+    }
+    /* 선택된 pill */
+    div[data-testid="stPills"] button[aria-checked="true"] {
+        background:rgba(59,130,246,0.3) !important;
+        border-color:#3B82F6 !important;
+        box-shadow:0 0 12px rgba(59,130,246,0.3) !important;
+    }
+    </style>""", unsafe_allow_html=True)
 
     selected = st.pills(
         "nav", list(NAV_MAP.keys()),
