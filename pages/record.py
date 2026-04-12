@@ -165,25 +165,6 @@ with st.form("record_form"):
         st.caption("즐겨찾기가 비어있습니다. 설정 > 즐겨찾기에서 등록하세요.")
         selected_favs = []
 
-    # 운동 기록 (복수 선택)
-    st.markdown("---")
-    st.markdown("**🏃 운동 기록** (여러 개 선택 가능)")
-    ex_display = [f"{e['icon']} {e['name']}" for e in EXERCISE_OPTIONS]
-    selected_exercises = st.multiselect(
-        "운동 선택", ex_display,
-        key="ex_multi", label_visibility="collapsed",
-    )
-    ex_durations = {}
-    for sel_ex in selected_exercises:
-        idx = ex_display.index(sel_ex)
-        ex_info = EXERCISE_OPTIONS[idx]
-        dur = st.number_input(
-            f"{sel_ex} 시간 (분)",
-            min_value=5, max_value=300, value=30, step=5,
-            key=f"exdur_{idx}",
-        )
-        ex_durations[idx] = dur
-
     # 물 섭취
     st.markdown("---")
     today_water = get_water_log(email, date_str)
@@ -260,14 +241,6 @@ if submitted:
     # 체중 저장 (항상)
     save_weight(email, date_str, today_weight)
 
-    # 운동 저장 (복수)
-    for idx, dur in ex_durations.items():
-        ex_info = EXERCISE_OPTIONS[idx]
-        met = ex_info["met"] if ex_info["met"] > 0 else 5.0
-        save_exercise(email, date_str, ex_info["name"], dur, met, today_weight)
-        cal_burned = round(met * today_weight * dur / 60)
-        st.success(f"🏃 {ex_info['icon']} {ex_info['name']} {dur}분 ({cal_burned}kcal 소모) 기록!")
-
     # 물 저장
     if water_ml > 0:
         save_water(email, date_str, water_ml)
@@ -285,6 +258,38 @@ if submitted:
     else:
         st.success(f"💾 체중 {today_weight}kg 기록 완료!")
     st.rerun()
+
+# ═══════════════════════════════════════════════════════════════
+# 운동 기록 (폼 밖 — multiselect 즉시 반응)
+# ═══════════════════════════════════════════════════════════════
+
+st.divider()
+st.markdown("**🏃 운동 기록** (여러 개 선택 가능)")
+ex_display = [f"{e['icon']} {e['name']}" for e in EXERCISE_OPTIONS]
+selected_exercises = st.multiselect(
+    "운동 선택", ex_display,
+    key="ex_multi", label_visibility="collapsed",
+)
+
+if selected_exercises:
+    ex_durations = {}
+    for sel_ex in selected_exercises:
+        idx = ex_display.index(sel_ex)
+        dur = st.number_input(
+            f"{sel_ex} 시간 (분)",
+            min_value=5, max_value=300, value=30, step=5,
+            key=f"exdur_{idx}",
+        )
+        ex_durations[idx] = dur
+
+    if st.button("🏃 운동 저장", use_container_width=True):
+        for idx, dur in ex_durations.items():
+            ex_info = EXERCISE_OPTIONS[idx]
+            met = ex_info["met"] if ex_info["met"] > 0 else 5.0
+            save_exercise(email, date_str, ex_info["name"], dur, met, latest_weight)
+            cal_burned = round(met * latest_weight * dur / 60)
+            st.success(f"{ex_info['icon']} {ex_info['name']} {dur}분 ({cal_burned}kcal) 저장!")
+        st.rerun()
 
 # ═══════════════════════════════════════════════════════════════
 # 저장된 기록
