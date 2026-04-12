@@ -9,7 +9,9 @@ from google.oauth2.service_account import Credentials
 
 from config import (
     SHEETS_NAME, WS_MEALS, WS_PROFILES, WS_MEMOS, WS_WEIGHT_LOG,
+    WS_EXERCISE_LOG, WS_WATER_LOG, WS_FAVORITES,
     MEALS_HEADERS, PROFILES_HEADERS, MEMOS_HEADERS, WEIGHT_LOG_HEADERS,
+    EXERCISE_LOG_HEADERS, WATER_LOG_HEADERS, FAVORITES_HEADERS,
 )
 
 SCOPES = [
@@ -294,3 +296,116 @@ def get_top_foods(email: str, days: int = 30) -> pd.DataFrame:
     ).reset_index().sort_values("count", ascending=False).head(5)
     counts["avg_cal"] = counts["avg_cal"].round(0).astype(int)
     return counts
+
+
+# ─── Exercise Log ────────────────────────────────────────────
+
+def save_exercise(email: str, date: str, name: str, duration: int, met: float, weight: float) -> None:
+    ws = _get_worksheet(WS_EXERCISE_LOG)
+    _ensure_headers(ws, EXERCISE_LOG_HEADERS)
+    cal_burned = round(met * weight * duration / 60)
+    ws.append_row([email, date, name, duration, met, cal_burned, datetime.now().isoformat()])
+    get_exercise_log.clear()
+
+
+@st.cache_data(ttl=300)
+def get_exercise_log(_email: str, start_date: str, end_date: str) -> pd.DataFrame:
+    ws = _get_worksheet(WS_EXERCISE_LOG)
+    _ensure_headers(ws, EXERCISE_LOG_HEADERS)
+    records = ws.get_all_records()
+    if not records:
+        return pd.DataFrame(columns=EXERCISE_LOG_HEADERS)
+    df = pd.DataFrame(records)
+    mask = (df["email"] == _email) & (df["date"] >= start_date) & (df["date"] <= end_date)
+    result = df[mask].reset_index(drop=True)
+    for c in ["duration_min", "met", "calories_burned"]:
+        if c in result.columns:
+            result[c] = pd.to_numeric(result[c], errors="coerce").fillna(0)
+    return result
+
+
+def get_daily_burned(email: str, date: str) -> float:
+    df = get_exercise_log(email, date, date)
+    return float(df["calories_burned"].sum()) if not df.empty else 0
+
+
+# ─── Water Log ───────────────────────────────────────────────
+
+def save_water(email: str, date: str, ml: int) -> None:
+    ws = _get_worksheet(WS_WATER_LOG)
+    _ensure_headers(ws, WATER_LOG_HEADERS)
+    ws.append_row([email, date, ml, datetime.now().isoformat()])
+    get_water_log.clear()
+
+
+@st.cache_data(ttl=300)
+def get_water_log(_email: str, date: str) -> int:
+    ws = _get_worksheet(WS_WATER_LOG)
+    _ensure_headers(ws, WATER_LOG_HEADERS)
+    records = ws.get_all_records()
+    total = 0
+    for r in records:
+        if r.get("email") == _email and r.get("date") == date:
+            try:
+                total += int(r["ml"])
+            except (ValueError, KeyError):
+                pass
+    return total
+
+
+# ─── Favorites ───────────────────────────────────────────────
+
+@st.cache_data(ttl=300)
+def get_favorites(_email: str) -> list[dict]:
+    ws = _get_worksheet(WS_FAVORITES)
+    _ensure_headers(ws, FAVORITES_HEADERS)
+    records = ws.get_all_records()
+    favs = [r for r in records if r.get("email") == _email]
+    favs.sort(key=lambda r: int(r.get("use_count", 0)), reverse=True)
+    return favs
+
+
+def add_favorite(email: str, food: dict) -> None:
+    ws = _get_worksheet(WS_FAVORITES)
+    _ensure_headers(ws, FAVORITES_HEADERS)
+    records = ws.get_all_records()
+
+    # 이미 존재하면 use_count 증가
+    for i, r in enumerate(records):
+        if r.get("email") == email and r.get("food_name") == food.get("name"):
+            row_idx = i + 2
+            new_count = int(r.get("use_count", 0)) + 1
+            ws.update(f"H{row_idx}", [[new_count]])
+            ws.update(f"I{row_idx}", [[datetime.now().isoformat()]])
+            get_favorites.clear()
+            return
+
+    ws.append_row([
+        email, food.get("name", ""), food.get("amount", ""),
+        food.get("calories", 0), food.get("carbs", 0),
+        food.get("protein", 0), food.get("fat", 0),
+        1, datetime.now().isoformat(),
+    ])
+    get_favorites.clear()
+
+
+def auto_add_favorites_from_meals(email: str) -> None:
+    """최근 식사 기록에서 3회 이상 먹은 음식을 자동으로 즐겨찾기에 추가."""
+    top = get_top_foods(email, days=60)
+    if top.empty:
+        return
+    existing = {f["food_name"] for f in get_favorites(email)}
+    meals_df = get_meals(email,
+                         (datetime.now() - timedelta(days=60)).strftime("%Y-%m-%d"),
+                         datetime.now().strftime("%Y-%m-%d"))
+    for _, row in top.iterrows():
+        if row["count"] >= 3 and row["food_name"] not in existing:
+            food_row = meals_df[meals_df["food_name"] == row["food_name"]].iloc[0]
+            add_favorite(email, {
+                "name": food_row.get("food_name", ""),
+                "amount": food_row.get("amount", ""),
+                "calories": int(food_row.get("calories", 0)),
+                "carbs": int(food_row.get("carbs", 0)),
+                "protein": int(food_row.get("protein", 0)),
+                "fat": int(food_row.get("fat", 0)),
+            })

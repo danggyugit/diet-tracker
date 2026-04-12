@@ -14,6 +14,15 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
+# PWA 메타 태그 — 모바일 홈 화면 추가 시 앱처럼 동작
+st.markdown("""
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="식단트래커">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#0F172A">
+""", unsafe_allow_html=True)
+
 render_sidebar_account()
 
 PAGES = {

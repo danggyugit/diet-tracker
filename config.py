@@ -55,3 +55,44 @@ MEMOS_HEADERS = ["email", "date", "condition", "memo", "created_at"]
 
 WS_WEIGHT_LOG = "weight_log"
 WEIGHT_LOG_HEADERS = ["email", "date", "weight", "created_at"]
+
+WS_EXERCISE_LOG = "exercise_log"
+EXERCISE_LOG_HEADERS = [
+    "email", "date", "exercise_name", "duration_min",
+    "met", "calories_burned", "created_at",
+]
+
+WS_WATER_LOG = "water_log"
+WATER_LOG_HEADERS = ["email", "date", "ml", "created_at"]
+
+WS_FAVORITES = "favorites"
+FAVORITES_HEADERS = [
+    "email", "food_name", "amount", "calories",
+    "carbs", "protein", "fat", "use_count", "updated_at",
+]
+
+# 운동 선택 목록 (기록용, MET 포함)
+EXERCISE_OPTIONS = [
+    {"name": "걷기 (빠른 걸음)", "met": 4.5, "icon": "🚶"},
+    {"name": "러닝 (조깅)",       "met": 7.0, "icon": "🏃"},
+    {"name": "러닝 (빠른 페이스)","met": 9.8, "icon": "🏃‍♂️"},
+    {"name": "자전거",            "met": 7.5, "icon": "🚴"},
+    {"name": "수영",              "met": 8.0, "icon": "🏊"},
+    {"name": "골프 (연습)",       "met": 3.5, "icon": "⛳"},
+    {"name": "골프 (라운드)",     "met": 4.8, "icon": "⛳"},
+    {"name": "등산",              "met": 6.0, "icon": "🥾"},
+    {"name": "요가/스트레칭",     "met": 2.5, "icon": "🧘"},
+    {"name": "웨이트 트레이닝",   "met": 5.0, "icon": "🏋️"},
+    {"name": "배드민턴",          "met": 5.5, "icon": "🏸"},
+    {"name": "테니스",            "met": 7.0, "icon": "🎾"},
+    {"name": "축구",              "met": 7.0, "icon": "⚽"},
+    {"name": "농구",              "met": 6.5, "icon": "🏀"},
+    {"name": "강아지 산책",       "met": 3.0, "icon": "🐕"},
+    {"name": "집안일/청소",       "met": 3.5, "icon": "🧹"},
+    {"name": "계단 오르기",       "met": 8.0, "icon": "🪜"},
+    {"name": "줄넘기",            "met": 10.0,"icon": "🪢"},
+    {"name": "필라테스",          "met": 3.0, "icon": "🤸"},
+    {"name": "직접 입력",         "met": 0,   "icon": "✏️"},
+]
+
+WATER_TARGET_ML = 2000  # 일일 물 섭취 목표 기본값

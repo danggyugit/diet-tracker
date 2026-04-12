@@ -296,6 +296,28 @@ else:
             annotation_text=f"목표: {target_wt}kg",
         )
 
+    # 목표 달성 예측선 (데이터 2개 이상 + 목표 설정 시)
+    if len(weight_log) >= 2 and target_wt > 0:
+        first_wt = float(weight_log.iloc[0]["weight"])
+        last_wt = float(weight_log.iloc[-1]["weight"])
+        first_date = weight_log.iloc[0]["date"]
+        last_date = weight_log.iloc[-1]["date"]
+        elapsed = (datetime.date.fromisoformat(last_date) - datetime.date.fromisoformat(first_date)).days
+        if elapsed > 0:
+            daily_rate = (last_wt - first_wt) / elapsed
+            if daily_rate != 0:
+                days_to_goal = int((target_wt - last_wt) / daily_rate)
+                if 0 < days_to_goal < 365:
+                    pred_date = (datetime.date.fromisoformat(last_date) + datetime.timedelta(days=days_to_goal)).isoformat()
+                    fig_weight.add_trace(go.Scatter(
+                        x=[last_date, pred_date],
+                        y=[last_wt, target_wt],
+                        mode="lines",
+                        name=f"예측 ({pred_date})",
+                        line=dict(color="#22C55E", width=2, dash="dot"),
+                    ))
+                    st.caption(f"📈 현재 페이스 유지 시 **{pred_date}**에 목표 {target_wt}kg 달성 예측")
+
     fig_weight.update_layout(
         **PLOT_CFG, height=350,
         xaxis_title="날짜", yaxis_title="체중 (kg)",
@@ -336,4 +358,42 @@ else:
     else:
         st.info("체중이 유지되고 있습니다.")
 
-# 메모·컨디션 입력은 식단 기록 페이지로 이동됨
+# ═══════════════════════════════════════════════════════════════
+# 9. 주간 리포트
+# ═══════════════════════════════════════════════════════════════
+
+st.subheader("📋 주간 리포트")
+
+week_start = (today - datetime.timedelta(days=today.weekday())).isoformat()
+week_end = today.isoformat()
+week_totals = get_daily_totals(email, week_start, week_end)
+week_weight = get_weight_log(email, week_start, week_end)
+
+if week_totals.empty and week_weight.empty:
+    st.info("이번 주 기록이 없습니다.")
+else:
+    report_lines = []
+
+    if not week_totals.empty:
+        avg_cal = week_totals["total_cal"].mean()
+        days_recorded = len(week_totals)
+        over_days = int((week_totals["total_cal"] > target).sum())
+        report_lines.append(f"- 평균 섭취: **{avg_cal:,.0f} kcal/일** ({days_recorded}일 기록)")
+        report_lines.append(f"- 목표 초과 일수: **{over_days}일** / {days_recorded}일")
+
+    if not week_weight.empty and len(week_weight) >= 2:
+        w_start = float(week_weight.iloc[0]["weight"])
+        w_end = float(week_weight.iloc[-1]["weight"])
+        w_change = w_end - w_start
+        report_lines.append(f"- 체중 변화: **{w_change:+.1f} kg** ({w_start:.1f} → {w_end:.1f})")
+
+    if not week_totals.empty and target > 0:
+        avg_cal = week_totals["total_cal"].mean()
+        if avg_cal <= target:
+            report_lines.append(f"- 평가: 🟢 목표 이내 유지 중!")
+        elif avg_cal <= target * 1.1:
+            report_lines.append(f"- 평가: 🟡 목표에 근접, 조금만 더 조절하세요")
+        else:
+            report_lines.append(f"- 평가: 🔴 목표 초과, 식단 점검이 필요합니다")
+
+    st.markdown("\n".join(report_lines))
