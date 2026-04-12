@@ -114,7 +114,35 @@ else:
     st.caption(status)
 
 if is_below_safety:
-    st.warning(f"⚠️ 목표 예산({daily_budget:,}kcal)이 안전 하한선({SAFETY_FLOOR:,}kcal) 미만입니다.")
+    st.caption(f"⚠️ 일일 목표({daily_budget:,})가 안전 권장량({SAFETY_FLOOR:,}) 미만")
+
+# ─── 오늘 영양소 합계 ────────────────────────────────────────
+if not today_totals.empty:
+    t_carbs = float(today_totals.get("total_carbs", [0]).sum()) if "total_carbs" in today_totals.columns else 0
+    t_protein = float(today_totals.get("total_protein", [0]).sum()) if "total_protein" in today_totals.columns else 0
+    t_fat = float(today_totals.get("total_fat", [0]).sum()) if "total_fat" in today_totals.columns else 0
+    total_macro = t_carbs + t_protein + t_fat
+    pct_c = round(t_carbs / total_macro * 100) if total_macro > 0 else 0
+    pct_p = round(t_protein / total_macro * 100) if total_macro > 0 else 0
+    pct_f = round(t_fat / total_macro * 100) if total_macro > 0 else 0
+
+    st.markdown(
+        f"<div style='display:flex;gap:8px;justify-content:center;margin:8px 0;'>"
+        f"<div style='flex:1;background:rgba(251,191,36,0.15);border-radius:10px;padding:8px;text-align:center;'>"
+        f"<div style='font-size:20px;'>🍚</div>"
+        f"<div style='font-size:13px;font-weight:700;color:#FBBF24;'>{t_carbs:.0f}g</div>"
+        f"<div style='font-size:10px;color:#94A3B8;'>탄수화물 {pct_c}%</div></div>"
+        f"<div style='flex:1;background:rgba(239,68,68,0.15);border-radius:10px;padding:8px;text-align:center;'>"
+        f"<div style='font-size:20px;'>🥩</div>"
+        f"<div style='font-size:13px;font-weight:700;color:#EF4444;'>{t_protein:.0f}g</div>"
+        f"<div style='font-size:10px;color:#94A3B8;'>단백질 {pct_p}%</div></div>"
+        f"<div style='flex:1;background:rgba(107,114,128,0.15);border-radius:10px;padding:8px;text-align:center;'>"
+        f"<div style='font-size:20px;'>🧈</div>"
+        f"<div style='font-size:13px;font-weight:700;color:#9CA3AF;'>{t_fat:.0f}g</div>"
+        f"<div style='font-size:10px;color:#94A3B8;'>지방 {pct_f}%</div></div>"
+        f"</div>",
+        unsafe_allow_html=True,
+    )
 
 # ═══════════════════════════════════════════════════════════════
 # 3. 통합 입력 폼
