@@ -73,7 +73,7 @@ selected_date = st.date_input("날짜", value=datetime.date.today())
 date_str = selected_date.isoformat()
 
 # ═══════════════════════════════════════════════════════════════
-# 2. 순 칼로리 게이지
+# 2. 순 칼로리 게이지 (박스 영역)
 # ═══════════════════════════════════════════════════════════════
 
 today_totals = get_daily_totals(email, date_str, date_str)
@@ -89,25 +89,29 @@ elif remaining_cal > 0:
 else:
     bar_color, status = "#EF4444", f"{abs(remaining_cal):,.0f} kcal 초과"
 
+BOX_STYLE = "background:#F8FAFC;border:1px solid #E2E8F0;border-radius:12px;padding:16px;margin-bottom:12px;"
+
+st.markdown(f'<div style="{BOX_STYLE}">', unsafe_allow_html=True)
+
 gauge_max = max(daily_budget * 1.3, net_cal * 1.1, 100)
 fig_budget = go.Figure(go.Indicator(
     mode="gauge+number",
     value=net_cal,
     gauge=dict(
-        axis=dict(range=[0, gauge_max], tickfont=dict(size=10)),
+        axis=dict(range=[0, gauge_max], tickfont=dict(size=10, color="#64748B")),
         bar=dict(color=bar_color, thickness=0.3),
         steps=[
-            dict(range=[0, daily_budget * 0.3], color="rgba(34,197,94,0.6)"),
-            dict(range=[daily_budget * 0.3, daily_budget * 0.6], color="rgba(34,197,94,0.4)"),
+            dict(range=[0, daily_budget * 0.3], color="rgba(34,197,94,0.5)"),
+            dict(range=[daily_budget * 0.3, daily_budget * 0.6], color="rgba(34,197,94,0.35)"),
             dict(range=[daily_budget * 0.6, daily_budget * 0.85], color="rgba(250,204,21,0.35)"),
-            dict(range=[daily_budget * 0.85, daily_budget], color="rgba(251,146,60,0.4)"),
-            dict(range=[daily_budget, daily_budget * 1.1], color="rgba(239,68,68,0.4)"),
-            dict(range=[daily_budget * 1.1, gauge_max], color="rgba(239,68,68,0.6)"),
+            dict(range=[daily_budget * 0.85, daily_budget], color="rgba(251,146,60,0.35)"),
+            dict(range=[daily_budget, daily_budget * 1.1], color="rgba(239,68,68,0.35)"),
+            dict(range=[daily_budget * 1.1, gauge_max], color="rgba(239,68,68,0.5)"),
         ],
-        threshold=dict(line=dict(color="#F8FAFC", width=2), value=daily_budget),
+        threshold=dict(line=dict(color="#1E293B", width=2), value=daily_budget),
     ),
-    title=dict(text="순 칼로리 (섭취 - 운동)", font=dict(size=14)),
-    number=dict(suffix=f" / {daily_budget:,} kcal", font=dict(size=18), valueformat=","),
+    title=dict(text="순 칼로리 (섭취 - 운동)", font=dict(size=14, color="#334155")),
+    number=dict(suffix=f" / {daily_budget:,} kcal", font=dict(size=18, color="#1E293B"), valueformat=","),
 ))
 fig_budget.update_layout(**PLOT_CFG, height=180, margin=dict(l=15, r=15, t=45, b=0))
 st.plotly_chart(fig_budget, use_container_width=True)
@@ -119,6 +123,8 @@ else:
 
 if is_below_safety:
     st.caption(f"⚠️ 일일 목표({daily_budget:,})가 안전 권장량({SAFETY_FLOOR:,}) 미만")
+
+st.markdown('</div>', unsafe_allow_html=True)
 
 # ─── 오늘 영양소 (목표 대비 섭취량 바) ────────────────────────
 # 매크로 목표: 탄 50%, 단 30%, 지 20% (1g 탄=4kcal, 단=4kcal, 지=9kcal)
@@ -185,6 +191,7 @@ def _mini_donut(current, goal, color, bg_color):
     )
     return fig
 
+st.markdown(f'<div style="{BOX_STYLE}">', unsafe_allow_html=True)
 if t_carbs + t_protein + t_fat > 0:
     macros = [
         ("🍚 탄수화물", t_carbs, target_carbs, "#22C55E"),
@@ -206,7 +213,7 @@ if t_carbs + t_protein + t_fat > 0:
             colors = [color, "#EF4444"]
         else:
             values = [cur, goal - cur]
-            colors = [color, "rgba(30,41,59,0.6)"]
+            colors = [color, "rgba(226,232,240,0.6)"]
         fig_macros.add_trace(go.Pie(
             values=values,
             marker=dict(colors=colors),
@@ -236,8 +243,8 @@ if t_carbs + t_protein + t_fat > 0:
         over_html = f"<div style='color:#EF4444;font-size:11px;'>+{over:.0f}g 초과</div>" if over > 0 else ""
         label_html += (
             f"<div style='flex:1;'>"
-            f"<div style='font-size:12px;color:#F8FAFC;'>{name}</div>"
-            f"<div style='font-size:11px;color:#94A3B8;'>{cur:.0f} / {goal}g</div>"
+            f"<div style='font-size:12px;color:#334155;'>{name}</div>"
+            f"<div style='font-size:11px;color:#64748B;'>{cur:.0f} / {goal}g</div>"
             f"{over_html}</div>"
         )
     label_html += "</div>"
@@ -245,6 +252,7 @@ if t_carbs + t_protein + t_fat > 0:
     st.caption(f"목표 비율 — 탄 50% ({target_carbs}g) · 단 30% ({target_protein}g) · 지 20% ({target_fat}g)")
 else:
     st.caption("오늘 식사 기록이 없습니다.")
+st.markdown('</div>', unsafe_allow_html=True)
 
 # ═══════════════════════════════════════════════════════════════
 # 3. 통합 입력 폼

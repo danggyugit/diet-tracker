@@ -58,12 +58,12 @@ def render_sidebar_account() -> None:
         )
         st.markdown(
             f'<div style="display:flex;align-items:center;gap:8px;padding:6px;'
-            f'background:rgba(30,41,59,0.5);border-radius:8px;">'
+            f'background:#F1F5F9;border-radius:8px;border:1px solid #E2E8F0;">'
             f'{avatar_html}'
             f'<div style="overflow:hidden;min-width:0;">'
-            f'<div style="font-weight:600;color:#F8FAFC;font-size:13px;'
+            f'<div style="font-weight:600;color:#1E293B;font-size:13px;'
             f'overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{name}</div>'
-            f'<div style="font-size:10px;color:#94A3B8;'
+            f'<div style="font-size:10px;color:#64748B;'
             f'overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{email}</div>'
             f'</div></div>',
             unsafe_allow_html=True,

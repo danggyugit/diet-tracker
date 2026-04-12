@@ -29,10 +29,10 @@ EXERCISE_TABLE = [
 ]
 
 PLOT_CFG = dict(
-    template="plotly_dark",
+    template="plotly_white",
     paper_bgcolor="rgba(0,0,0,0)",
-    plot_bgcolor="rgba(15,23,42,0.5)",
-    font=dict(color="#F8FAFC"),
+    plot_bgcolor="rgba(0,0,0,0)",
+    font=dict(color="#1E293B"),
 )
 
 SHEETS_NAME = "diet_tracker_db"
