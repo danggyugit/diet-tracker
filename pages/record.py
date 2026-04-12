@@ -149,36 +149,61 @@ def _macro_bar(icon, name, current, goal, color):
     )
 
 
-# 도넛 차트 + 프로그레스 바
-if t_carbs + t_protein + t_fat > 0:
-    dc1, dc2 = st.columns([2, 3])
-    with dc1:
-        fig_donut = go.Figure(go.Pie(
-            labels=["탄수화물", "단백질", "지방"],
-            values=[t_carbs, t_protein, t_fat],
-            marker=dict(colors=["#FBBF24", "#3B82F6", "#8B5CF6"]),
-            textinfo="percent",
-            textfont=dict(size=11),
-            hole=0.55,
-            hovertemplate="%{label}: %{value:.0f}g (%{percent})<extra></extra>",
+# 영양소별 도넛 차트 3개
+def _mini_donut(current, goal, color, bg_color):
+    pct = min(current / goal * 100, 100) if goal > 0 else 0
+    over = max(current - goal, 0)
+    fig = go.Figure()
+    if over > 0:
+        # 초과: 빨간색 전체 + 중앙 텍스트
+        fig.add_trace(go.Pie(
+            values=[goal, over],
+            marker=dict(colors=[color, "#EF4444"]),
+            hole=0.7, textinfo="none", hoverinfo="skip",
+            direction="clockwise", sort=False,
         ))
-        fig_donut.update_layout(
-            **PLOT_CFG, height=160, showlegend=False,
-            margin=dict(l=5, r=5, t=5, b=5),
-            annotations=[dict(
-                text=f"<b>{eaten_cal:,.0f}</b><br><span style='font-size:10px'>kcal</span>",
-                x=0.5, y=0.5, font=dict(size=16, color="#F8FAFC"),
-                showarrow=False,
-            )],
-        )
-        st.plotly_chart(fig_donut, use_container_width=True)
-    with dc2:
-        st.markdown(
-            _macro_bar("🍚", "탄수화물", t_carbs, target_carbs, "#FBBF24")
-            + _macro_bar("🥩", "단백질", t_protein, target_protein, "#3B82F6")
-            + _macro_bar("🧈", "지방", t_fat, target_fat, "#8B5CF6"),
-            unsafe_allow_html=True,
-        )
+    else:
+        # 미달: 색상 + 남은 부분 회색
+        fig.add_trace(go.Pie(
+            values=[current, goal - current],
+            marker=dict(colors=[color, "rgba(30,41,59,0.6)"]),
+            hole=0.7, textinfo="none", hoverinfo="skip",
+            direction="clockwise", sort=False,
+        ))
+    fig.update_layout(
+        **PLOT_CFG, height=110, showlegend=False,
+        margin=dict(l=0, r=0, t=0, b=0),
+        annotations=[dict(
+            text=f"<b>{current:.0f}g</b>",
+            x=0.5, y=0.5, font=dict(size=14, color=color if over == 0 else "#EF4444"),
+            showarrow=False,
+        )],
+    )
+    return fig
+
+if t_carbs + t_protein + t_fat > 0:
+    mc1, mc2, mc3 = st.columns(3)
+    with mc1:
+        st.plotly_chart(_mini_donut(t_carbs, target_carbs, "#FBBF24", "rgba(251,191,36,0.1)"), use_container_width=True)
+        over_c = t_carbs - target_carbs
+        lbl = f"**🍚 탄수화물**  \n{t_carbs:.0f} / {target_carbs}g"
+        if over_c > 0:
+            lbl += f"  \n<span style='color:#EF4444;font-size:12px;'>+{over_c:.0f}g 초과</span>"
+        st.markdown(f"<div style='text-align:center;font-size:13px;'>{lbl}</div>", unsafe_allow_html=True)
+    with mc2:
+        st.plotly_chart(_mini_donut(t_protein, target_protein, "#3B82F6", "rgba(59,130,246,0.1)"), use_container_width=True)
+        over_p = t_protein - target_protein
+        lbl = f"**🥩 단백질**  \n{t_protein:.0f} / {target_protein}g"
+        if over_p > 0:
+            lbl += f"  \n<span style='color:#EF4444;font-size:12px;'>+{over_p:.0f}g 초과</span>"
+        st.markdown(f"<div style='text-align:center;font-size:13px;'>{lbl}</div>", unsafe_allow_html=True)
+    with mc3:
+        st.plotly_chart(_mini_donut(t_fat, target_fat, "#8B5CF6", "rgba(139,92,246,0.1)"), use_container_width=True)
+        over_f = t_fat - target_fat
+        lbl = f"**🧈 지방**  \n{t_fat:.0f} / {target_fat}g"
+        if over_f > 0:
+            lbl += f"  \n<span style='color:#EF4444;font-size:12px;'>+{over_f:.0f}g 초과</span>"
+        st.markdown(f"<div style='text-align:center;font-size:13px;'>{lbl}</div>", unsafe_allow_html=True)
     st.caption(f"목표 비율 — 탄 50% ({target_carbs}g) · 단 30% ({target_protein}g) · 지 20% ({target_fat}g)")
 else:
     st.caption("오늘 식사 기록이 없습니다.")
