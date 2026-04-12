@@ -69,7 +69,8 @@ is_below_safety = daily_budget < SAFETY_FLOOR
 # 1. 날짜
 # ═══════════════════════════════════════════════════════════════
 
-selected_date = st.date_input("날짜", value=datetime.date.today())
+from config import today_kst
+selected_date = st.date_input("날짜", value=today_kst())
 date_str = selected_date.isoformat()
 
 # ═══════════════════════════════════════════════════════════════

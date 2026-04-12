@@ -43,7 +43,8 @@ def calc_daily_deficit(
     """
     from datetime import date
 
-    today_dt = date.fromisoformat(today) if today else date.today()
+    from config import today_kst
+    today_dt = date.fromisoformat(today) if today else today_kst()
     try:
         target_dt = date.fromisoformat(target_date)
     except (ValueError, TypeError):

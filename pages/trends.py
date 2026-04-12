@@ -19,7 +19,7 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
-from config import PLOT_CFG
+from config import PLOT_CFG, today_kst
 from services.auth_service import require_auth
 from services.sheets_service import (
     get_daily_totals, get_all_meals_for_year, get_top_foods,
@@ -45,7 +45,7 @@ target = int(profile.get("target_calories", 0)) or round(tdee)
 period = st.radio("기간", ["7일", "30일"], horizontal=True)
 days = 7 if period == "7일" else 30
 
-today = datetime.date.today()
+today = today_kst()
 start = (today - datetime.timedelta(days=days - 1)).isoformat()
 end = today.isoformat()
 

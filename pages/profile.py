@@ -4,7 +4,7 @@ import datetime
 
 import streamlit as st
 
-from config import ACTIVITY_MULTIPLIERS
+from config import ACTIVITY_MULTIPLIERS, today_kst
 from services.auth_service import require_auth
 from services.sheets_service import get_profile, save_profile, get_latest_weight
 from services.calorie_service import calc_bmr, calc_tdee, calc_daily_deficit
@@ -74,12 +74,12 @@ with st.form("profile_form"):
         default_date = (
             datetime.date.fromisoformat(saved_date)
             if saved_date
-            else datetime.date.today() + datetime.timedelta(days=90)
+            else today_kst() + datetime.timedelta(days=90)
         )
         target_date = st.date_input(
             "목표 날짜",
             value=default_date,
-            min_value=datetime.date.today(),
+            min_value=today_kst(),
         )
     with goal_col3:
         target_calories = st.number_input(

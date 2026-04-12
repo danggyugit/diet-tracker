@@ -1,5 +1,14 @@
 """Diet Tracker 전역 상수 정의."""
 
+import datetime
+from zoneinfo import ZoneInfo
+
+KST = ZoneInfo("Asia/Seoul")
+
+
+def today_kst() -> datetime.date:
+    return datetime.datetime.now(KST).date()
+
 GEMINI_MODEL = "gemini-2.0-flash"
 
 ALLOWED_EXTENSIONS = {"jpg", "jpeg", "png"}

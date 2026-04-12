@@ -9,7 +9,7 @@ import datetime
 import plotly.graph_objects as go
 import streamlit as st
 
-from config import PLOT_CFG, MEAL_TYPES
+from config import PLOT_CFG, MEAL_TYPES, today_kst
 from services.auth_service import require_auth
 from services.sheets_service import (
     get_daily_totals, get_meals_for_date, get_profile, get_memo,
@@ -45,9 +45,9 @@ else:
 
 # ─── 월/년 네비게이터 ────────────────────────────────────────
 if "cal_year" not in st.session_state:
-    st.session_state.cal_year = datetime.date.today().year
+    st.session_state.cal_year = today_kst().year
 if "cal_month" not in st.session_state:
-    st.session_state.cal_month = datetime.date.today().month
+    st.session_state.cal_month = today_kst().month
 
 nc1, nc2, nc3 = st.columns([1, 2, 1], gap="small")
 if nc1.button("◀", use_container_width=True):
@@ -92,7 +92,7 @@ if not totals_df.empty:
 # ─── HTML 캘린더 테이블 ──────────────────────────────────────
 cal_obj = calendar.Calendar(firstweekday=0)
 weeks = cal_obj.monthdatescalendar(year, month)
-today = datetime.date.today()
+today = today_kst()
 
 
 def _cell_color(cal_val: int) -> tuple[str, str]:
