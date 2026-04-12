@@ -353,6 +353,20 @@ def get_water_log(_email: str, date: str) -> int:
     return total
 
 
+def reset_water(email: str, date: str) -> None:
+    """해당 날짜 물 섭취 기록 전체 삭제."""
+    ws = _get_worksheet(WS_WATER_LOG)
+    _ensure_headers(ws, WATER_LOG_HEADERS)
+    records = ws.get_all_records()
+    rows_to_delete = []
+    for i, r in enumerate(records):
+        if r.get("email") == email and r.get("date") == date:
+            rows_to_delete.append(i + 2)
+    for row_num in sorted(rows_to_delete, reverse=True):
+        ws.delete_rows(row_num)
+    get_water_log.clear()
+
+
 # ─── Favorites ───────────────────────────────────────────────
 
 @st.cache_data(ttl=300)

@@ -36,29 +36,26 @@ if "cal_year" not in st.session_state:
 if "cal_month" not in st.session_state:
     st.session_state.cal_month = datetime.date.today().month
 
-col_prev, col_title, col_next = st.columns([1, 3, 1])
-with col_prev:
-    if st.button("◀ 이전"):
-        if st.session_state.cal_month == 1:
-            st.session_state.cal_month = 12
-            st.session_state.cal_year -= 1
-        else:
-            st.session_state.cal_month -= 1
-        st.rerun()
-with col_title:
-    st.markdown(
-        f"<h3 style='text-align:center;margin:0;'>"
-        f"{st.session_state.cal_year}년 {st.session_state.cal_month}월</h3>",
-        unsafe_allow_html=True,
-    )
-with col_next:
-    if st.button("다음 ▶"):
-        if st.session_state.cal_month == 12:
-            st.session_state.cal_month = 1
-            st.session_state.cal_year += 1
-        else:
-            st.session_state.cal_month += 1
-        st.rerun()
+nc1, nc2, nc3 = st.columns([1, 2, 1], gap="small")
+if nc1.button("◀", use_container_width=True):
+    if st.session_state.cal_month == 1:
+        st.session_state.cal_month = 12
+        st.session_state.cal_year -= 1
+    else:
+        st.session_state.cal_month -= 1
+    st.rerun()
+nc2.markdown(
+    f"<h3 style='text-align:center;margin:0;line-height:2.2;'>"
+    f"{st.session_state.cal_year}년 {st.session_state.cal_month}월</h3>",
+    unsafe_allow_html=True,
+)
+if nc3.button("▶", use_container_width=True):
+    if st.session_state.cal_month == 12:
+        st.session_state.cal_month = 1
+        st.session_state.cal_year += 1
+    else:
+        st.session_state.cal_month += 1
+    st.rerun()
 
 year = st.session_state.cal_year
 month = st.session_state.cal_month

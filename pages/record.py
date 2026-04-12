@@ -23,7 +23,7 @@ from services.sheets_service import (
     get_latest_weight, save_weight, get_daily_totals,
     save_memo, get_memo,
     save_exercise, get_daily_burned, get_exercise_log,
-    save_water, get_water_log,
+    save_water, get_water_log, reset_water,
     get_favorites, add_favorite, auto_add_favorites_from_meals,
 )
 
@@ -248,6 +248,32 @@ if submitted:
         st.rerun()
 
 # ═══════════════════════════════════════════════════════════════
+# 즐겨찾기 빠른 추가 (폼 바로 아래, 눈에 잘 띄는 위치)
+# ═══════════════════════════════════════════════════════════════
+
+favorites = get_favorites(email)
+if favorites:
+    with st.expander(f"⭐ 자주 먹는 음식 ({len(favorites[:10])}개)", expanded=True):
+        for i, fav in enumerate(favorites[:10]):
+            fc1, fc2 = st.columns([4, 1])
+            fc1.markdown(
+                f"**{fav['food_name']}** · "
+                f"<span style='color:#94A3B8;font-size:13px;'>{fav.get('calories', 0)}kcal</span>",
+                unsafe_allow_html=True,
+            )
+            if fc2.button("추가", key=f"fav_{i}", use_container_width=True):
+                save_meals(email, date_str, meal_type, [{
+                    "name": fav["food_name"], "amount": fav.get("amount", ""),
+                    "calories": int(fav.get("calories", 0)),
+                    "carbs": int(fav.get("carbs", 0)),
+                    "protein": int(fav.get("protein", 0)),
+                    "fat": int(fav.get("fat", 0)),
+                    "quantity": 1.0, "source": "favorite",
+                }])
+                st.success(f"⭐ {fav['food_name']} 추가!")
+                st.rerun()
+
+# ═══════════════════════════════════════════════════════════════
 # 2단계: 분석 결과 확인 → 수정 → 저장
 # ═══════════════════════════════════════════════════════════════
 
@@ -295,35 +321,6 @@ if st.session_state.pending_foods:
     if cancel_btn:
         st.session_state.pending_foods = []
         st.rerun()
-
-# ═══════════════════════════════════════════════════════════════
-# 즐겨찾기 빠른 추가
-# ═══════════════════════════════════════════════════════════════
-
-favorites = get_favorites(email)
-if favorites:
-    st.divider()
-    st.markdown("#### ⭐ 자주 먹는 음식")
-    for i, fav in enumerate(favorites[:10]):
-        fc1, fc2 = st.columns([4, 1])
-        fc1.caption(
-            f"**{fav['food_name']}** {fav.get('amount', '')} · "
-            f"{fav.get('calories', 0)}kcal"
-        )
-        if fc2.button("추가", key=f"fav_{i}"):
-            save_meals(email, date_str, meal_type, [{
-                "name": fav["food_name"], "amount": fav.get("amount", ""),
-                "calories": int(fav.get("calories", 0)),
-                "carbs": int(fav.get("carbs", 0)),
-                "protein": int(fav.get("protein", 0)),
-                "fat": int(fav.get("fat", 0)),
-                "quantity": 1.0, "source": "favorite",
-            }])
-            add_favorite(email, {"name": fav["food_name"], "amount": fav.get("amount", ""),
-                                 "calories": fav.get("calories", 0), "carbs": fav.get("carbs", 0),
-                                 "protein": fav.get("protein", 0), "fat": fav.get("fat", 0)})
-            st.success(f"⭐ {fav['food_name']} 추가!")
-            st.rerun()
 
 # ═══════════════════════════════════════════════════════════════
 # 저장된 기록
@@ -396,7 +393,11 @@ if not ex_log.empty:
 total_water = get_water_log(email, date_str)
 if total_water > 0:
     pct = min(total_water / WATER_TARGET_ML * 100, 100)
-    st.markdown(f"**💧 물 섭취** {total_water}ml / {WATER_TARGET_ML}ml ({pct:.0f}%)")
+    wc1, wc2 = st.columns([4, 1])
+    wc1.markdown(f"**💧 물 섭취** {total_water}ml / {WATER_TARGET_ML}ml ({pct:.0f}%)")
+    if wc2.button("초기화", key="water_reset"):
+        reset_water(email, date_str)
+        st.rerun()
 
 # ─── 메모/컨디션 표시 ────────────────────────────────────────
 saved_memo = get_memo(email, date_str)
