@@ -11,7 +11,7 @@ st.set_page_config(
     page_title="식단 트래커",
     page_icon="🥗",
     layout="wide",
-    initial_sidebar_state="expanded",
+    initial_sidebar_state="collapsed",
 )
 
 render_sidebar_account()
@@ -31,4 +31,15 @@ PAGES = {
 }
 
 pg = st.navigation(PAGES, position="sidebar")
+
+# ─── 상단 네비게이션 바 ──────────────────────────────────────
+if is_logged_in():
+    nav_cols = st.columns(5, gap="small")
+    nav_cols[0].page_link("pages/record.py", label="기록", icon="🍽️", use_container_width=True)
+    nav_cols[1].page_link("pages/calendar_view.py", label="캘린더", icon="📅", use_container_width=True)
+    nav_cols[2].page_link("pages/trends.py", label="트렌드", icon="📊", use_container_width=True)
+    nav_cols[3].page_link("pages/profile.py", label="프로필", icon="👤", use_container_width=True)
+    nav_cols[4].page_link("pages/favorites.py", label="즐겨찾기", icon="⭐", use_container_width=True)
+    st.divider()
+
 pg.run()
