@@ -182,28 +182,62 @@ def _mini_donut(current, goal, color, bg_color):
     return fig
 
 if t_carbs + t_protein + t_fat > 0:
-    mc1, mc2, mc3 = st.columns(3)
-    with mc1:
-        st.plotly_chart(_mini_donut(t_carbs, target_carbs, "#FBBF24", "rgba(251,191,36,0.1)"), use_container_width=True)
-        over_c = t_carbs - target_carbs
-        lbl = f"**🍚 탄수화물**  \n{t_carbs:.0f} / {target_carbs}g"
-        if over_c > 0:
-            lbl += f"  \n<span style='color:#EF4444;font-size:12px;'>+{over_c:.0f}g 초과</span>"
-        st.markdown(f"<div style='text-align:center;font-size:13px;'>{lbl}</div>", unsafe_allow_html=True)
-    with mc2:
-        st.plotly_chart(_mini_donut(t_protein, target_protein, "#3B82F6", "rgba(59,130,246,0.1)"), use_container_width=True)
-        over_p = t_protein - target_protein
-        lbl = f"**🥩 단백질**  \n{t_protein:.0f} / {target_protein}g"
-        if over_p > 0:
-            lbl += f"  \n<span style='color:#EF4444;font-size:12px;'>+{over_p:.0f}g 초과</span>"
-        st.markdown(f"<div style='text-align:center;font-size:13px;'>{lbl}</div>", unsafe_allow_html=True)
-    with mc3:
-        st.plotly_chart(_mini_donut(t_fat, target_fat, "#8B5CF6", "rgba(139,92,246,0.1)"), use_container_width=True)
-        over_f = t_fat - target_fat
-        lbl = f"**🧈 지방**  \n{t_fat:.0f} / {target_fat}g"
-        if over_f > 0:
-            lbl += f"  \n<span style='color:#EF4444;font-size:12px;'>+{over_f:.0f}g 초과</span>"
-        st.markdown(f"<div style='text-align:center;font-size:13px;'>{lbl}</div>", unsafe_allow_html=True)
+    macros = [
+        ("🍚 탄수화물", t_carbs, target_carbs, "#FBBF24"),
+        ("🥩 단백질", t_protein, target_protein, "#3B82F6"),
+        ("🧈 지방", t_fat, target_fat, "#8B5CF6"),
+    ]
+    # Plotly subplots로 도넛 3개를 하나의 차트에 (모바일 가로 유지)
+    from plotly.subplots import make_subplots
+    fig_macros = make_subplots(
+        rows=1, cols=3,
+        specs=[[{"type": "pie"}, {"type": "pie"}, {"type": "pie"}]],
+        horizontal_spacing=0.02,
+    )
+    annotations = []
+    for i, (name, cur, goal, color) in enumerate(macros):
+        over = max(cur - goal, 0)
+        if over > 0:
+            values = [goal, over]
+            colors = [color, "#EF4444"]
+        else:
+            values = [cur, goal - cur]
+            colors = [color, "rgba(30,41,59,0.6)"]
+        fig_macros.add_trace(go.Pie(
+            values=values,
+            marker=dict(colors=colors),
+            hole=0.7, textinfo="none", hoverinfo="skip",
+            direction="clockwise", sort=False,
+        ), row=1, col=i+1)
+        # 중앙 텍스트
+        x_pos = [0.13, 0.5, 0.87][i]
+        annotations.append(dict(
+            text=f"<b>{cur:.0f}g</b>",
+            x=x_pos, y=0.5,
+            font=dict(size=13, color=color if over == 0 else "#EF4444"),
+            showarrow=False,
+        ))
+
+    fig_macros.update_layout(
+        **PLOT_CFG, height=120, showlegend=False,
+        margin=dict(l=0, r=0, t=0, b=0),
+        annotations=annotations,
+    )
+    st.plotly_chart(fig_macros, use_container_width=True)
+
+    # 라벨 (HTML로 가로 3칸)
+    label_html = "<div style='display:flex;text-align:center;gap:4px;'>"
+    for name, cur, goal, color in macros:
+        over = cur - goal
+        over_html = f"<div style='color:#EF4444;font-size:11px;'>+{over:.0f}g 초과</div>" if over > 0 else ""
+        label_html += (
+            f"<div style='flex:1;'>"
+            f"<div style='font-size:12px;color:#F8FAFC;'>{name}</div>"
+            f"<div style='font-size:11px;color:#94A3B8;'>{cur:.0f} / {goal}g</div>"
+            f"{over_html}</div>"
+        )
+    label_html += "</div>"
+    st.markdown(label_html, unsafe_allow_html=True)
     st.caption(f"목표 비율 — 탄 50% ({target_carbs}g) · 단 30% ({target_protein}g) · 지 20% ({target_fat}g)")
 else:
     st.caption("오늘 식사 기록이 없습니다.")
