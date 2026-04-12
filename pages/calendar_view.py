@@ -8,6 +8,7 @@ import datetime
 
 import plotly.graph_objects as go
 import streamlit as st
+import streamlit.components.v1 as components
 
 from config import PLOT_CFG, MEAL_TYPES
 from services.auth_service import require_auth
@@ -147,7 +148,7 @@ for week in weeks:
 
 html += "</table>"
 cal_height = 30 + len(weeks) * 65
-st.html(html, height=cal_height)
+components.html(html, height=cal_height)
 
 st.caption(
     f"🟢 목표 이하 · 🟡 목표 근접 · 🔴 목표 초과 (목표: {target:,} kcal) · 날짜를 터치하면 상세 보기"
