@@ -17,7 +17,6 @@ from config import (
 )
 from services.auth_service import require_auth
 from services.gemini_service import analyze_food_image, estimate_multiple_foods
-from services.barcode_service import lookup_barcode, decode_barcode_from_image, PYZBAR_AVAILABLE
 from services.calorie_service import calc_bmr, calc_tdee, calc_exercise_plan, calc_daily_deficit
 from services.sheets_service import (
     get_profile, get_meals_for_date, save_meals, delete_meal_row, update_meal_row,
@@ -140,15 +139,6 @@ with st.form("record_form"):
         help="JPG, PNG / 최대 10MB", label_visibility="collapsed",
     )
 
-    # 바코드 스캔
-    st.markdown("---")
-    st.markdown("**📦 바코드 (포장 식품)**")
-    barcode_input = st.text_input("바코드 번호 입력", placeholder="880123456789", key="barcode")
-    if PYZBAR_AVAILABLE:
-        barcode_cam = st.camera_input("또는 바코드 촬영", key="barcode_cam")
-    else:
-        barcode_cam = None
-
     # 수동 음식
     st.markdown("---")
     st.markdown("**✏️ 수동 음식 추가** (한 줄에 하나씩)")
@@ -214,24 +204,6 @@ if submitted:
                 pending.extend(result["foods"])
             elif result:
                 st.warning(result.get("error", "음식을 인식하지 못했습니다."))
-
-    # 바코드 조회
-    bc_number = barcode_input.strip()
-    if not bc_number and barcode_cam:
-        bc_number = decode_barcode_from_image(barcode_cam.getvalue()) or ""
-        if bc_number:
-            st.info(f"바코드 인식: {bc_number}")
-    if bc_number:
-        with st.spinner(f"바코드 {bc_number} 조회 중..."):
-            bc_result = lookup_barcode(bc_number)
-        if bc_result:
-            bc_result["source"] = "barcode"
-            pending.append(bc_result)
-            st.success(f"📦 {bc_result['name']} ({bc_result['calories']}kcal/100g)")
-            if bc_result.get("note"):
-                st.caption(bc_result["note"])
-        else:
-            st.warning(f"바코드 {bc_number}에 해당하는 제품을 찾지 못했습니다.")
 
     # 수동 음식
     food_lines = [l.strip() for l in manual_text.strip().split("\n") if l.strip()] if manual_text.strip() else []
