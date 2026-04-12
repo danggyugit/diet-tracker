@@ -35,6 +35,7 @@ PAGES = {
     ],
     "설정": [
         st.Page("pages/profile.py", title="프로필", icon=":material/person:"),
+        st.Page("pages/favorites.py", title="즐겨찾기", icon=":material/star:"),
     ],
 }
 

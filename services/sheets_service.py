@@ -404,6 +404,38 @@ def add_favorite(email: str, food: dict) -> None:
     get_favorites.clear()
 
 
+def delete_favorite(email: str, food_name: str) -> bool:
+    ws = _get_worksheet(WS_FAVORITES)
+    _ensure_headers(ws, FAVORITES_HEADERS)
+    records = ws.get_all_records()
+    for i, r in enumerate(records):
+        if r.get("email") == email and r.get("food_name") == food_name:
+            ws.delete_rows(i + 2)
+            get_favorites.clear()
+            return True
+    return False
+
+
+def update_favorite(email: str, food_name: str, data: dict) -> bool:
+    ws = _get_worksheet(WS_FAVORITES)
+    _ensure_headers(ws, FAVORITES_HEADERS)
+    records = ws.get_all_records()
+    for i, r in enumerate(records):
+        if r.get("email") == email and r.get("food_name") == food_name:
+            row_idx = i + 2
+            ws.update(f"B{row_idx}:G{row_idx}", [[
+                data.get("food_name", food_name),
+                data.get("amount", ""),
+                data.get("calories", 0),
+                data.get("carbs", 0),
+                data.get("protein", 0),
+                data.get("fat", 0),
+            ]])
+            get_favorites.clear()
+            return True
+    return False
+
+
 def auto_add_favorites_from_meals(email: str) -> None:
     """최근 식사 기록에서 3회 이상 먹은 음식을 자동으로 즐겨찾기에 추가."""
     top = get_top_foods(email, days=60)

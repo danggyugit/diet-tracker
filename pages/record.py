@@ -258,7 +258,7 @@ if not favorites:
     favorites = get_favorites(email)
 
 if favorites:
-    with st.expander(f"⭐ 자주 먹는 음식 ({len(favorites[:10])}개)", expanded=True):
+    with st.expander(f"⭐ 자주 먹는 음식 ({len(favorites[:10])}개)", expanded=False):
         for i, fav in enumerate(favorites[:10]):
             fc1, fc2 = st.columns([4, 1])
             fc1.markdown(
