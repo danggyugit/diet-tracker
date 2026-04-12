@@ -89,10 +89,6 @@ elif remaining_cal > 0:
 else:
     bar_color, status = "#FB7185", f"{abs(remaining_cal):,.0f} kcal 초과"
 
-BOX_STYLE = "background:rgba(30,41,59,0.5);border:1px solid rgba(148,163,184,0.15);border-radius:12px;padding:16px;margin-bottom:12px;"
-
-st.markdown(f'<div style="{BOX_STYLE}">', unsafe_allow_html=True)
-
 gauge_max = max(daily_budget * 1.3, net_cal * 1.1, 100)
 fig_budget = go.Figure(go.Indicator(
     mode="gauge+number",
@@ -123,8 +119,6 @@ else:
 
 if is_below_safety:
     st.caption(f"⚠️ 일일 목표({daily_budget:,})가 안전 권장량({SAFETY_FLOOR:,}) 미만")
-
-st.markdown('</div>', unsafe_allow_html=True)
 
 # ─── 오늘 영양소 (목표 대비 섭취량 바) ────────────────────────
 # 매크로 목표: 탄 50%, 단 30%, 지 20% (1g 탄=4kcal, 단=4kcal, 지=9kcal)
@@ -191,7 +185,6 @@ def _mini_donut(current, goal, color, bg_color):
     )
     return fig
 
-st.markdown(f'<div style="{BOX_STYLE}">', unsafe_allow_html=True)
 if t_carbs + t_protein + t_fat > 0:
     macros = [
         ("🍚 탄수화물", t_carbs, target_carbs, "#4ADE80"),
@@ -252,7 +245,6 @@ if t_carbs + t_protein + t_fat > 0:
     st.caption(f"목표 비율 — 탄 50% ({target_carbs}g) · 단 30% ({target_protein}g) · 지 20% ({target_fat}g)")
 else:
     st.caption("오늘 식사 기록이 없습니다.")
-st.markdown('</div>', unsafe_allow_html=True)
 
 # ═══════════════════════════════════════════════════════════════
 # AI 식단 추천
@@ -291,7 +283,7 @@ if st.button("🤖 오늘 뭐 먹을까? (AI 추천)", use_container_width=True)
 
 if st.session_state.recommend_result:
     rec = st.session_state.recommend_result
-    st.markdown(f'<div style="{BOX_STYLE}">', unsafe_allow_html=True)
+    st.divider()
     st.markdown(f"#### 🤖 AI 추천: {rec.get('recommendation', '')}")
 
     for meal in rec.get("meals", []):
@@ -325,8 +317,6 @@ if st.session_state.recommend_result:
     if st.button("닫기", key="rec_close"):
         st.session_state.recommend_result = None
         st.rerun()
-
-    st.markdown('</div>', unsafe_allow_html=True)
 
 # ═══════════════════════════════════════════════════════════════
 # 3. 통합 입력 폼
