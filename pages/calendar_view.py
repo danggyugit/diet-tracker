@@ -113,10 +113,10 @@ html = """
 <style>
 .cal-table { width:100%; border-collapse:separate; border-spacing:3px; table-layout:fixed; }
 .cal-table th { text-align:center; color:#94A3B8; font-size:13px; font-weight:600; padding:4px 0; }
-.cal-table td { border-radius:8px; padding:3px; vertical-align:top; height:72px; }
+.cal-table td { border-radius:8px; padding:3px; vertical-align:top; height:95px; }
 .cal-day { font-size:11px; color:#94A3B8; }
-.cal-val { font-size:13px; font-weight:600; }
-.cal-detail { font-size:8px; color:#64748B; line-height:1.3; }
+.cal-val { font-size:14px; font-weight:700; }
+.cal-detail { font-size:10px; color:#CBD5E1; line-height:1.4; }
 </style>
 <table class="cal-table">
 <tr><th>월</th><th>화</th><th>수</th><th>목</th><th>금</th><th>토</th><th>일</th></tr>
@@ -138,9 +138,13 @@ for week in weeks:
         border = "2px solid #3B82F6" if is_today else "1px solid rgba(148,163,184,0.15)"
 
         if eaten > 0 and burned > 0:
-            detail = f"<div class='cal-detail'>식{eaten:,}-운{burned:,}</div>"
+            detail = (
+                f"<div class='cal-detail'>"
+                f"식 {eaten:,}<br>운 {burned:,}"
+                f"</div>"
+            )
         elif eaten > 0:
-            detail = f"<div class='cal-detail'>섭취</div>"
+            detail = f"<div class='cal-detail'>식 {eaten:,}</div>"
         else:
             detail = ""
 
