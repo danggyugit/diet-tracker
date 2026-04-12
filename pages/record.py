@@ -15,11 +15,15 @@ from services.auth_service import require_auth
 from services.gemini_service import analyze_food_image, estimate_multiple_foods
 from services.calorie_service import calc_bmr, calc_tdee, calc_exercise_plan, calc_daily_deficit
 from services.sheets_service import (
-    get_profile, get_meals_for_date, save_meals, delete_meal_row,
+    get_profile, get_meals_for_date, save_meals, delete_meal_row, update_meal_row,
     get_latest_weight, save_weight, get_daily_totals, save_memo, get_memo,
 )
 
 email = require_auth()
+
+# ─── 세션 상태 ───────────────────────────────────────────────
+if "editing_key" not in st.session_state:
+    st.session_state.editing_key = None
 
 # ─── 프로필 + TDEE (캐싱됨) ──────────────────────────────────
 profile = get_profile(email) or {}
@@ -215,23 +219,59 @@ else:
         st.markdown(f"**{mt}** ({meal_df['total_cal'].sum():,.0f} kcal)")
 
         for idx, row in meal_df.iterrows():
-            r1, r2 = st.columns([5, 1])
-            with r1:
-                st.markdown(
-                    f"**{row['food_name']}** {row.get('amount', '')}  \n"
-                    f"<span style='font-size:13px;color:#94A3B8;'>"
-                    f"{int(row['calories'])}kcal × {row['quantity']}인분 = {int(row['total_cal'])}kcal"
-                    f"</span>",
-                    unsafe_allow_html=True,
-                )
-            with r2:
-                if st.button("삭제", key=f"sdel_{mt}_{idx}"):
-                    delete_meal_row(
-                        email, date_str,
-                        row["food_name"],
-                        str(row.get("created_at", "")),
+            row_key = f"{mt}_{idx}"
+            is_editing = st.session_state.editing_key == row_key
+
+            if is_editing:
+                # 수정 모드
+                with st.form(f"edit_form_{row_key}"):
+                    st.markdown(f"**{row['food_name']}** 수정")
+                    ec1, ec2 = st.columns(2)
+                    edit_cal = ec1.number_input(
+                        "칼로리", value=int(row["calories"]),
+                        min_value=0, key=f"ecal_{row_key}",
                     )
-                    st.rerun()
+                    edit_qty = ec2.number_input(
+                        "인분", value=float(row["quantity"]),
+                        min_value=0.5, max_value=10.0, step=0.5,
+                        key=f"eqty_{row_key}",
+                    )
+                    bc1, bc2 = st.columns(2)
+                    if bc1.form_submit_button("저장", use_container_width=True):
+                        update_meal_row(
+                            email, date_str,
+                            row["food_name"],
+                            str(row.get("created_at", "")),
+                            edit_cal, edit_qty,
+                        )
+                        st.session_state.editing_key = None
+                        st.rerun()
+                    if bc2.form_submit_button("취소", use_container_width=True):
+                        st.session_state.editing_key = None
+                        st.rerun()
+            else:
+                # 표시 모드
+                r1, r2, r3 = st.columns([5, 1, 1])
+                with r1:
+                    st.markdown(
+                        f"**{row['food_name']}** {row.get('amount', '')}  \n"
+                        f"<span style='font-size:13px;color:#94A3B8;'>"
+                        f"{int(row['calories'])}kcal × {row['quantity']}인분 = {int(row['total_cal'])}kcal"
+                        f"</span>",
+                        unsafe_allow_html=True,
+                    )
+                with r2:
+                    if st.button("수정", key=f"sedit_{row_key}"):
+                        st.session_state.editing_key = row_key
+                        st.rerun()
+                with r3:
+                    if st.button("삭제", key=f"sdel_{row_key}"):
+                        delete_meal_row(
+                            email, date_str,
+                            row["food_name"],
+                            str(row.get("created_at", "")),
+                        )
+                        st.rerun()
 
 # ─── 메모/컨디션 표시 ────────────────────────────────────────
 saved_memo = get_memo(email, date_str)

@@ -153,6 +153,26 @@ def delete_meal_row(email: str, date: str, food_name: str, created_at: str) -> b
     return False
 
 
+def update_meal_row(email: str, date: str, food_name: str, created_at: str,
+                    new_calories: int, new_quantity: float) -> bool:
+    """저장된 식사 기록의 칼로리·수량 수정."""
+    ws = _get_worksheet(WS_MEALS)
+    _ensure_headers(ws, MEALS_HEADERS)
+    records = ws.get_all_records()
+    for i, r in enumerate(records):
+        if (r.get("email") == email and r.get("date") == date
+                and r.get("food_name") == food_name
+                and str(r.get("created_at", "")) == str(created_at)):
+            row_num = i + 2
+            # calories=F, quantity=J, total_cal=K (1-indexed)
+            ws.update(f"F{row_num}", [[new_calories]])
+            ws.update(f"J{row_num}", [[new_quantity]])
+            ws.update(f"K{row_num}", [[round(new_calories * new_quantity)]])
+            get_meals.clear()
+            return True
+    return False
+
+
 @st.cache_data(ttl=300)
 def get_all_meals_for_year(_email: str, year: int) -> pd.DataFrame:
     start = f"{year}-01-01"
