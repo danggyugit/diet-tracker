@@ -250,19 +250,19 @@ else:
                         st.session_state.editing_key = None
                         st.rerun()
             else:
-                # 표시 모드
-                st.markdown(
-                    f"**{row['food_name']}** {row.get('amount', '')} · "
-                    f"<span style='color:#94A3B8;'>"
-                    f"{int(row['calories'])}kcal × {row['quantity']}인분 = {int(row['total_cal'])}kcal"
+                # 표시 모드 — 음식명 | 수정 | 삭제 한 줄
+                rc1, rc2, rc3 = st.columns([4, 1, 1])
+                rc1.markdown(
+                    f"**{row['food_name']}** {row.get('amount', '')}  \n"
+                    f"<span style='font-size:12px;color:#94A3B8;'>"
+                    f"{int(row['calories'])}×{row['quantity']}={int(row['total_cal'])}kcal"
                     f"</span>",
                     unsafe_allow_html=True,
                 )
-                bc1, bc2, bc3 = st.columns([1, 1, 4])
-                if bc1.button("수정", key=f"sedit_{row_key}", use_container_width=True):
+                if rc2.button("수정", key=f"sedit_{row_key}"):
                     st.session_state.editing_key = row_key
                     st.rerun()
-                if bc2.button("삭제", key=f"sdel_{row_key}", use_container_width=True):
+                if rc3.button("삭제", key=f"sdel_{row_key}"):
                     delete_meal_row(
                         email, date_str,
                         row["food_name"],
