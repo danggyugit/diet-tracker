@@ -149,13 +149,39 @@ def _macro_bar(icon, name, current, goal, color):
     )
 
 
-st.markdown(
-    _macro_bar("🍚", "탄수화물", t_carbs, target_carbs, "#FBBF24")
-    + _macro_bar("🥩", "단백질", t_protein, target_protein, "#3B82F6")
-    + _macro_bar("🧈", "지방", t_fat, target_fat, "#8B5CF6"),
-    unsafe_allow_html=True,
-)
-st.caption(f"목표 비율 — 탄 50% ({target_carbs}g) · 단 30% ({target_protein}g) · 지 20% ({target_fat}g)")
+# 도넛 차트 + 프로그레스 바
+if t_carbs + t_protein + t_fat > 0:
+    dc1, dc2 = st.columns([2, 3])
+    with dc1:
+        fig_donut = go.Figure(go.Pie(
+            labels=["탄수화물", "단백질", "지방"],
+            values=[t_carbs, t_protein, t_fat],
+            marker=dict(colors=["#FBBF24", "#3B82F6", "#8B5CF6"]),
+            textinfo="percent",
+            textfont=dict(size=11),
+            hole=0.55,
+            hovertemplate="%{label}: %{value:.0f}g (%{percent})<extra></extra>",
+        ))
+        fig_donut.update_layout(
+            **PLOT_CFG, height=160, showlegend=False,
+            margin=dict(l=5, r=5, t=5, b=5),
+            annotations=[dict(
+                text=f"<b>{eaten_cal:,.0f}</b><br><span style='font-size:10px'>kcal</span>",
+                x=0.5, y=0.5, font=dict(size=16, color="#F8FAFC"),
+                showarrow=False,
+            )],
+        )
+        st.plotly_chart(fig_donut, use_container_width=True)
+    with dc2:
+        st.markdown(
+            _macro_bar("🍚", "탄수화물", t_carbs, target_carbs, "#FBBF24")
+            + _macro_bar("🥩", "단백질", t_protein, target_protein, "#3B82F6")
+            + _macro_bar("🧈", "지방", t_fat, target_fat, "#8B5CF6"),
+            unsafe_allow_html=True,
+        )
+    st.caption(f"목표 비율 — 탄 50% ({target_carbs}g) · 단 30% ({target_protein}g) · 지 20% ({target_fat}g)")
+else:
+    st.caption("오늘 식사 기록이 없습니다.")
 
 # ═══════════════════════════════════════════════════════════════
 # 3. 통합 입력 폼
