@@ -83,11 +83,11 @@ net_cal = eaten_cal - burned_cal
 remaining_cal = daily_budget - net_cal
 
 if remaining_cal > daily_budget * 0.3:
-    bar_color, status = "#22C55E", f"남은 {remaining_cal:,.0f} kcal"
+    bar_color, status = "#4ADE80", f"남은 {remaining_cal:,.0f} kcal"
 elif remaining_cal > 0:
-    bar_color, status = "#FBBF24", f"남은 {remaining_cal:,.0f} kcal"
+    bar_color, status = "#FDE047", f"남은 {remaining_cal:,.0f} kcal"
 else:
-    bar_color, status = "#EF4444", f"{abs(remaining_cal):,.0f} kcal 초과"
+    bar_color, status = "#FB7185", f"{abs(remaining_cal):,.0f} kcal 초과"
 
 BOX_STYLE = "background:rgba(30,41,59,0.5);border:1px solid rgba(148,163,184,0.15);border-radius:12px;padding:16px;margin-bottom:12px;"
 
@@ -101,12 +101,12 @@ fig_budget = go.Figure(go.Indicator(
         axis=dict(range=[0, gauge_max], tickfont=dict(size=10)),
         bar=dict(color=bar_color, thickness=0.3),
         steps=[
-            dict(range=[0, daily_budget * 0.3], color="rgba(34,197,94,0.5)"),
-            dict(range=[daily_budget * 0.3, daily_budget * 0.6], color="rgba(34,197,94,0.35)"),
-            dict(range=[daily_budget * 0.6, daily_budget * 0.85], color="rgba(250,204,21,0.35)"),
-            dict(range=[daily_budget * 0.85, daily_budget], color="rgba(251,146,60,0.35)"),
-            dict(range=[daily_budget, daily_budget * 1.1], color="rgba(239,68,68,0.35)"),
-            dict(range=[daily_budget * 1.1, gauge_max], color="rgba(239,68,68,0.5)"),
+            dict(range=[0, daily_budget * 0.3], color="rgba(74,222,128,0.6)"),
+            dict(range=[daily_budget * 0.3, daily_budget * 0.6], color="rgba(74,222,128,0.4)"),
+            dict(range=[daily_budget * 0.6, daily_budget * 0.85], color="rgba(253,224,71,0.45)"),
+            dict(range=[daily_budget * 0.85, daily_budget], color="rgba(251,176,59,0.5)"),
+            dict(range=[daily_budget, daily_budget * 1.1], color="rgba(252,129,129,0.5)"),
+            dict(range=[daily_budget * 1.1, gauge_max], color="rgba(252,129,129,0.7)"),
         ],
         threshold=dict(line=dict(color="#F8FAFC", width=2), value=daily_budget),
     ),
@@ -143,7 +143,7 @@ def _macro_bar(icon, name, current, goal, color):
     bar_width = min(pct, 100)
     over = current - goal if current > goal else 0
     over_width = min(over / goal * 100, 50) if goal > 0 else 0
-    status_color = color if pct <= 100 else "#EF4444"
+    status_color = color if pct <= 100 else "#FB7185"
     status_text = f"{current:.0f} / {goal}g" if pct <= 100 else f"{current:.0f} / {goal}g (+{over:.0f}g 초과)"
     return (
         f"<div style='margin:6px 0;'>"
@@ -154,7 +154,7 @@ def _macro_bar(icon, name, current, goal, color):
         f"</div>"
         f"<div style='background:rgba(30,41,59,0.8);border-radius:6px;height:14px;position:relative;overflow:hidden;'>"
         f"<div style='width:{bar_width}%;height:100%;background:{color};border-radius:6px;'></div>"
-        f"{'<div style=\"position:absolute;top:0;left:' + str(bar_width) + '%;width:' + str(over_width) + '%;height:100%;background:#EF4444;border-radius:0 6px 6px 0;\"></div>' if over > 0 else ''}"
+        f"{'<div style=\"position:absolute;top:0;left:' + str(bar_width) + '%;width:' + str(over_width) + '%;height:100%;background:#FB7185;border-radius:0 6px 6px 0;\"></div>' if over > 0 else ''}"
         f"</div></div>"
     )
 
@@ -168,7 +168,7 @@ def _mini_donut(current, goal, color, bg_color):
         # 초과: 빨간색 전체 + 중앙 텍스트
         fig.add_trace(go.Pie(
             values=[goal, over],
-            marker=dict(colors=[color, "#EF4444"]),
+            marker=dict(colors=[color, "#FB7185"]),
             hole=0.7, textinfo="none", hoverinfo="skip",
             direction="clockwise", sort=False,
         ))
@@ -185,7 +185,7 @@ def _mini_donut(current, goal, color, bg_color):
         margin=dict(l=0, r=0, t=0, b=0),
         annotations=[dict(
             text=f"<b>{current:.0f}g</b>",
-            x=0.5, y=0.5, font=dict(size=14, color=color if over == 0 else "#EF4444"),
+            x=0.5, y=0.5, font=dict(size=14, color=color if over == 0 else "#FB7185"),
             showarrow=False,
         )],
     )
@@ -194,9 +194,9 @@ def _mini_donut(current, goal, color, bg_color):
 st.markdown(f'<div style="{BOX_STYLE}">', unsafe_allow_html=True)
 if t_carbs + t_protein + t_fat > 0:
     macros = [
-        ("🍚 탄수화물", t_carbs, target_carbs, "#22C55E"),
-        ("🥩 단백질", t_protein, target_protein, "#3B82F6"),
-        ("🧈 지방", t_fat, target_fat, "#F59E0B"),
+        ("🍚 탄수화물", t_carbs, target_carbs, "#4ADE80"),
+        ("🥩 단백질", t_protein, target_protein, "#60A5FA"),
+        ("🧈 지방", t_fat, target_fat, "#FBBF24"),
     ]
     # Plotly subplots로 도넛 3개를 하나의 차트에 (모바일 가로 유지)
     from plotly.subplots import make_subplots
@@ -210,7 +210,7 @@ if t_carbs + t_protein + t_fat > 0:
         over = max(cur - goal, 0)
         if over > 0:
             values = [goal, over]
-            colors = [color, "#EF4444"]
+            colors = [color, "#FB7185"]
         else:
             values = [cur, goal - cur]
             colors = [color, "rgba(30,41,59,0.6)"]
@@ -225,7 +225,7 @@ if t_carbs + t_protein + t_fat > 0:
         annotations.append(dict(
             text=f"<b>{cur:.0f}g</b>",
             x=x_pos, y=0.5,
-            font=dict(size=13, color=color if over == 0 else "#EF4444"),
+            font=dict(size=13, color=color if over == 0 else "#FB7185"),
             showarrow=False,
         ))
 
@@ -240,7 +240,7 @@ if t_carbs + t_protein + t_fat > 0:
     label_html = "<div style='display:flex;text-align:center;gap:4px;'>"
     for name, cur, goal, color in macros:
         over = cur - goal
-        over_html = f"<div style='color:#EF4444;font-size:11px;'>+{over:.0f}g 초과</div>" if over > 0 else ""
+        over_html = f"<div style='color:#FB7185;font-size:11px;'>+{over:.0f}g 초과</div>" if over > 0 else ""
         label_html += (
             f"<div style='flex:1;'>"
             f"<div style='font-size:12px;color:#F8FAFC;'>{name}</div>"
