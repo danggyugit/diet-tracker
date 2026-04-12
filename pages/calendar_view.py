@@ -131,9 +131,9 @@ html += "</table>"
 st.markdown(html, unsafe_allow_html=True)
 
 st.caption(
-    f"🟢 목표 이하 (~{target:,}) · "
-    f"🟡 소폭 초과 ({target+1:,}~{round(target*1.1):,}) · "
-    f"🔴 초과 ({round(target*1.1)+1:,}~) · "
+    f"🟢 목표 이하 (0 - {target:,}) · "
+    f"🟡 소폭 초과 ({target+1:,} - {round(target*1.1):,}) · "
+    f"🔴 초과 ({round(target*1.1)+1:,} 이상) · "
     f"목표: {target:,} kcal"
 )
 
