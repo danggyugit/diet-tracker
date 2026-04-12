@@ -32,6 +32,7 @@ def _get_spreadsheet() -> gspread.Spreadsheet:
     return _get_client().open(SHEETS_NAME)
 
 
+@st.cache_resource
 def _get_worksheet(name: str) -> gspread.Worksheet:
     ss = _get_spreadsheet()
     try:
@@ -185,12 +186,13 @@ def get_all_meals_for_year(_email: str, year: int) -> pd.DataFrame:
 
 # ─── Memos ────────────────────────────────────────────────
 
-def get_memo(email: str, date: str) -> dict | None:
+@st.cache_data(ttl=300)
+def get_memo(_email: str, date: str) -> dict | None:
     ws = _get_worksheet(WS_MEMOS)
     _ensure_headers(ws, MEMOS_HEADERS)
     records = ws.get_all_records()
     for r in records:
-        if r.get("email") == email and r.get("date") == date:
+        if r.get("email") == _email and r.get("date") == date:
             return r
     return None
 
@@ -212,6 +214,7 @@ def save_memo(email: str, date: str, condition: str, memo: str) -> None:
         ws.update(f"A{row_idx}:E{row_idx}", [row])
     else:
         ws.append_row(row)
+    get_memo.clear()
 
 
 # ─── Weight Log ──────────────────────────────────────────────
