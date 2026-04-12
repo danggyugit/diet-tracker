@@ -81,13 +81,14 @@ today = datetime.date.today()
 def _cell_color(cal_val: int) -> tuple[str, str]:
     if cal_val == 0:
         return "rgba(30,41,59,0.5)", "#64748B"
-    elif cal_val < target * 0.8:
-        return "rgba(22,101,52,0.5)", "#86EFAC"
-    elif cal_val <= target * 1.1:
+    elif cal_val <= target:
+        # 목표 이하 → 초록
         return "rgba(34,197,94,0.4)", "#22C55E"
-    elif cal_val <= target * 1.3:
+    elif cal_val <= target * 1.1:
+        # 목표 살짝 초과 (10% 이내) → 노랑
         return "rgba(253,224,71,0.3)", "#FBBF24"
     else:
+        # 목표 10% 이상 초과 → 빨강
         return "rgba(239,68,68,0.3)", "#EF4444"
 
 
