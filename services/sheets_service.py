@@ -27,6 +27,7 @@ def _get_client() -> gspread.Client:
     return gspread.authorize(creds)
 
 
+@st.cache_resource
 def _get_spreadsheet() -> gspread.Spreadsheet:
     return _get_client().open(SHEETS_NAME)
 
