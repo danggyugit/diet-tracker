@@ -1,6 +1,6 @@
-"""📅 캘린더 페이지 — 월별 칼로리 히트맵 + 일자 드릴다운.
+"""📅 캘린더 페이지 — 월별 칼로리 히트맵 + 날짜 클릭 드릴다운.
 
-HTML 테이블 기반 캘린더로 모바일에서도 7열 그리드 유지.
+HTML 테이블 + JS onclick → query_params로 날짜 선택.
 """
 
 import calendar
@@ -44,6 +44,7 @@ with col_prev:
             st.session_state.cal_year -= 1
         else:
             st.session_state.cal_month -= 1
+        st.query_params.pop("sel_date", None)
         st.rerun()
 with col_title:
     st.markdown(
@@ -58,6 +59,7 @@ with col_next:
             st.session_state.cal_year += 1
         else:
             st.session_state.cal_month += 1
+        st.query_params.pop("sel_date", None)
         st.rerun()
 
 year = st.session_state.cal_year
@@ -72,10 +74,14 @@ if not totals_df.empty:
     for _, row in totals_df.iterrows():
         daily_map[row["date"]] = int(row["total_cal"])
 
-# ─── HTML 캘린더 테이블 ──────────────────────────────────────
-cal = calendar.Calendar(firstweekday=0)
-weeks = cal.monthdatescalendar(year, month)
+# ─── 선택된 날짜 (query_params에서 읽기) ─────────────────────
+sel_date = st.query_params.get("sel_date")
+
+# ─── HTML 캘린더 테이블 (클릭 가능) ──────────────────────────
+cal_obj = calendar.Calendar(firstweekday=0)
+weeks = cal_obj.monthdatescalendar(year, month)
 today = datetime.date.today()
+
 
 def _cell_color(cal_val: int) -> tuple[str, str]:
     if cal_val == 0:
@@ -89,15 +95,27 @@ def _cell_color(cal_val: int) -> tuple[str, str]:
     else:
         return "rgba(239,68,68,0.3)", "#EF4444"
 
+
 html = """
 <style>
 .cal-table { width:100%; border-collapse:separate; border-spacing:3px; table-layout:fixed; }
 .cal-table th { text-align:center; color:#94A3B8; font-size:13px; font-weight:600; padding:4px 0; }
-.cal-table td { border-radius:8px; padding:4px; vertical-align:top; height:58px; }
+.cal-table td { border-radius:8px; padding:4px; vertical-align:top; height:58px; cursor:pointer; transition:opacity 0.15s; }
+.cal-table td:hover { opacity:0.75; }
+.cal-table td.selected { outline:2px solid #3B82F6; outline-offset:-2px; }
 .cal-day { font-size:11px; color:#94A3B8; }
 .cal-val { font-size:14px; font-weight:600; }
 .cal-unit { font-size:9px; color:#64748B; }
+.cal-empty { cursor:default; }
+.cal-empty:hover { opacity:1; }
 </style>
+<script>
+function selDate(d) {
+    const url = new URL(window.parent.location);
+    url.searchParams.set('sel_date', d);
+    window.parent.location = url;
+}
+</script>
 <table class="cal-table">
 <tr><th>월</th><th>화</th><th>수</th><th>목</th><th>금</th><th>토</th><th>일</th></tr>
 """
@@ -106,16 +124,20 @@ for week in weeks:
     html += "<tr>"
     for day in week:
         if day.month != month:
-            html += "<td style='background:transparent;'></td>"
+            html += "<td class='cal-empty' style='background:transparent;'></td>"
             continue
 
         date_key = day.isoformat()
         cal_val = daily_map.get(date_key, 0)
         bg, text_color = _cell_color(cal_val)
-        border = "2px solid #3B82F6" if day == today else "1px solid rgba(148,163,184,0.15)"
+        is_today = day == today
+        is_selected = date_key == sel_date
+        border = "2px solid #3B82F6" if is_today else "1px solid rgba(148,163,184,0.15)"
+        selected_cls = " selected" if is_selected else ""
 
         html += (
-            f"<td style='background:{bg};border:{border};'>"
+            f"<td class='{selected_cls}' onclick=\"selDate('{date_key}')\" "
+            f"style='background:{bg};border:{border};'>"
             f"<div class='cal-day'>{day.day}</div>"
             f"<div class='cal-val' style='color:{text_color};'>{cal_val:,}</div>"
             f"<div class='cal-unit'>kcal</div>"
@@ -126,30 +148,16 @@ for week in weeks:
 html += "</table>"
 st.markdown(html, unsafe_allow_html=True)
 
-# ─── 색상 범례 ───────────────────────────────────────────────
 st.caption(
-    f"🟢 목표 이하 · 🟡 목표 근접 · 🔴 목표 초과 (목표: {target:,} kcal)"
+    f"🟢 목표 이하 · 🟡 목표 근접 · 🔴 목표 초과 (목표: {target:,} kcal) · 날짜를 터치하면 상세 보기"
 )
 
 # ═══════════════════════════════════════════════════════════════
-# 드릴다운: 날짜 선택
+# 드릴다운: 선택된 날짜 상세
 # ═══════════════════════════════════════════════════════════════
 
-st.divider()
-
-# 기록이 있는 날짜 목록
-recorded_dates = sorted(daily_map.keys(), reverse=True)
-if recorded_dates:
-    sel_date = st.selectbox(
-        "날짜 선택 (상세 보기)",
-        recorded_dates,
-        format_func=lambda d: f"{d} ({daily_map.get(d, 0):,} kcal)",
-    )
-else:
-    sel_date = None
-    st.caption("이번 달 기록이 없습니다.")
-
 if sel_date:
+    st.divider()
     st.subheader(f"📋 {sel_date} 상세")
 
     day_meals = get_meals_for_date(email, sel_date)
@@ -163,7 +171,8 @@ if sel_date:
         )
 
     if day_meals.empty:
-        st.info("이 날의 식단 기록이 없습니다.")
+        if not day_memo:
+            st.info("이 날의 기록이 없습니다.")
     else:
         for c in ["total_cal", "carbs", "protein", "fat", "quantity"]:
             day_meals[c] = day_meals[c].apply(lambda x: float(x) if x else 0)
@@ -173,7 +182,6 @@ if sel_date:
         t_fat = (day_meals["fat"] * day_meals["quantity"]).sum()
         t_cal = day_meals["total_cal"].sum()
 
-        # 총합 + 매크로
         st.metric("총 칼로리", f"{t_cal:,.0f} kcal")
 
         fig = go.Figure(go.Pie(
@@ -199,6 +207,3 @@ if sel_date:
                     f"  · {row['food_name']} ({row.get('amount', '')}) "
                     f"— {row.get('total_cal', 0)} kcal"
                 )
-
-    if not day_memo and day_meals.empty:
-        st.info("이 날의 기록이 없습니다.")
