@@ -14,9 +14,9 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
-# 상단 빈공간 줄이기 (헤더는 유지 — 사이드바 토글 필요)
+# 상단 여백 조정 (사이드바 토글 버튼과 pills 겹침 방지)
 st.markdown("""<style>
-.block-container { padding-top:1rem !important; }
+.block-container { padding-top:2.5rem !important; }
 </style>""", unsafe_allow_html=True)
 
 render_sidebar_account()
