@@ -146,7 +146,8 @@ for week in weeks:
     html += "</tr>"
 
 html += "</table>"
-st.markdown(html, unsafe_allow_html=True)
+cal_height = 30 + len(weeks) * 65
+st.html(html, height=cal_height)
 
 st.caption(
     f"🟢 목표 이하 · 🟡 목표 근접 · 🔴 목표 초과 (목표: {target:,} kcal) · 날짜를 터치하면 상세 보기"
