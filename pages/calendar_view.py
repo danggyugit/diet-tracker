@@ -13,22 +13,35 @@ from config import PLOT_CFG, MEAL_TYPES
 from services.auth_service import require_auth
 from services.sheets_service import (
     get_daily_totals, get_meals_for_date, get_profile, get_memo,
+    get_latest_weight,
 )
-from services.calorie_service import calc_bmr, calc_tdee
+from services.calorie_service import calc_bmr, calc_tdee, calc_daily_deficit
 
 email = require_auth()
 st.title("📅 캘린더")
 
-# ─── 프로필 → TDEE 기준값 ──────────────────────────────────
+# ─── 프로필 → 일일 예산 (식단 기록과 동일 로직) ──────────────
 profile = get_profile(email) or {}
+latest_weight = get_latest_weight(email) or float(profile.get("weight", 70))
 bmr = calc_bmr(
-    float(profile.get("weight", 70)),
+    latest_weight,
     float(profile.get("height", 170)),
     int(profile.get("age", 30)),
     profile.get("gender", "남성"),
 )
 tdee = calc_tdee(bmr, profile.get("activity_level", "보통활동"))
-target = int(profile.get("target_calories", 0)) or round(tdee)
+
+target_cal = int(profile.get("target_calories", 0))
+target_wt = float(profile.get("target_weight", 0))
+target_dt = profile.get("target_date", "")
+
+if target_cal > 0:
+    target = target_cal
+elif target_wt > 0 and target_dt:
+    deficit = calc_daily_deficit(latest_weight, target_wt, target_dt)
+    target = round(tdee - deficit["deficit_per_day"])
+else:
+    target = round(tdee)
 
 # ─── 월/년 네비게이터 ────────────────────────────────────────
 if "cal_year" not in st.session_state:
