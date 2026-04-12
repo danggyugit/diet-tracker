@@ -94,6 +94,11 @@ st.caption(status)
 # 3. 통합 입력 폼 (체중 + 식사유형 + 사진 + 수동음식)
 # ═══════════════════════════════════════════════════════════════
 
+# 기존 메모 로드 (폼 밖에서 미리)
+existing_memo = get_memo(email, date_str)
+existing_condition = existing_memo.get("condition", "") if existing_memo else ""
+existing_memo_text = existing_memo.get("memo", "") if existing_memo else ""
+
 with st.form("record_form"):
     today_weight = st.number_input(
         "⚖️ 오늘 체중 (kg)", min_value=30.0, max_value=200.0,
@@ -120,8 +125,9 @@ with st.form("record_form"):
     st.markdown("---")
     st.markdown("**📝 오늘의 컨디션 & 메모**")
     from config import CONDITION_OPTIONS
-    memo_condition = st.selectbox("컨디션", CONDITION_OPTIONS, key="m_cond")
-    memo_text = st.text_input("메모", placeholder="오늘 식단에 대한 메모", key="m_memo")
+    cond_index = CONDITION_OPTIONS.index(existing_condition) if existing_condition in CONDITION_OPTIONS else 0
+    memo_condition = st.selectbox("컨디션", CONDITION_OPTIONS, index=cond_index, key="m_cond")
+    memo_text = st.text_input("메모", value=existing_memo_text, placeholder="오늘 식단에 대한 메모", key="m_memo")
 
     submitted = st.form_submit_button(
         "🔍 AI 분석 및 저장", type="primary", use_container_width=True,
