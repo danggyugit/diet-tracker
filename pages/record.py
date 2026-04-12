@@ -103,7 +103,7 @@ fig_budget = go.Figure(go.Indicator(
         threshold=dict(line=dict(color="#F8FAFC", width=2), value=daily_budget),
     ),
     title=dict(text="순 칼로리 (섭취 - 운동)", font=dict(size=14)),
-    number=dict(suffix=f" / {daily_budget:,} kcal", font=dict(size=18)),
+    number=dict(suffix=f" / {daily_budget:,} kcal", font=dict(size=18), valueformat=","),
 ))
 fig_budget.update_layout(**PLOT_CFG, height=180, margin=dict(l=15, r=15, t=45, b=0))
 st.plotly_chart(fig_budget, use_container_width=True)

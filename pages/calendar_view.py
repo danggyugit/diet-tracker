@@ -13,7 +13,7 @@ from config import PLOT_CFG, MEAL_TYPES
 from services.auth_service import require_auth
 from services.sheets_service import (
     get_daily_totals, get_meals_for_date, get_profile, get_memo,
-    get_latest_weight,
+    get_latest_weight, get_daily_burned,
 )
 from services.calorie_service import calc_bmr, calc_tdee, calc_daily_deficit
 
@@ -77,10 +77,17 @@ month = st.session_state.cal_month
 first_day = datetime.date(year, month, 1)
 last_day = datetime.date(year, month, calendar.monthrange(year, month)[1])
 totals_df = get_daily_totals(email, first_day.isoformat(), last_day.isoformat())
-daily_map = {}
+daily_eaten = {}
+daily_burned_map = {}
+daily_net = {}
 if not totals_df.empty:
     for _, row in totals_df.iterrows():
-        daily_map[row["date"]] = int(row["total_cal"])
+        d = row["date"]
+        eaten = int(row["total_cal"])
+        burned = int(get_daily_burned(email, d))
+        daily_eaten[d] = eaten
+        daily_burned_map[d] = burned
+        daily_net[d] = eaten - burned
 
 # ─── HTML 캘린더 테이블 ──────────────────────────────────────
 cal_obj = calendar.Calendar(firstweekday=0)
@@ -106,10 +113,10 @@ html = """
 <style>
 .cal-table { width:100%; border-collapse:separate; border-spacing:3px; table-layout:fixed; }
 .cal-table th { text-align:center; color:#94A3B8; font-size:13px; font-weight:600; padding:4px 0; }
-.cal-table td { border-radius:8px; padding:4px; vertical-align:top; height:58px; }
+.cal-table td { border-radius:8px; padding:3px; vertical-align:top; height:72px; }
 .cal-day { font-size:11px; color:#94A3B8; }
-.cal-val { font-size:14px; font-weight:600; }
-.cal-unit { font-size:9px; color:#64748B; }
+.cal-val { font-size:13px; font-weight:600; }
+.cal-detail { font-size:8px; color:#64748B; line-height:1.3; }
 </style>
 <table class="cal-table">
 <tr><th>월</th><th>화</th><th>수</th><th>목</th><th>금</th><th>토</th><th>일</th></tr>
@@ -123,16 +130,25 @@ for week in weeks:
             continue
 
         date_key = day.isoformat()
-        cal_val = daily_map.get(date_key, 0)
-        bg, text_color = _cell_color(cal_val)
+        eaten = daily_eaten.get(date_key, 0)
+        burned = daily_burned_map.get(date_key, 0)
+        net = daily_net.get(date_key, 0)
+        bg, text_color = _cell_color(net)
         is_today = day == today
         border = "2px solid #3B82F6" if is_today else "1px solid rgba(148,163,184,0.15)"
+
+        if eaten > 0 and burned > 0:
+            detail = f"<div class='cal-detail'>식{eaten:,}-운{burned:,}</div>"
+        elif eaten > 0:
+            detail = f"<div class='cal-detail'>섭취</div>"
+        else:
+            detail = ""
 
         html += (
             f"<td style='background:{bg};border:{border};'>"
             f"<div class='cal-day'>{day.day}</div>"
-            f"<div class='cal-val' style='color:{text_color};'>{cal_val:,}</div>"
-            f"<div class='cal-unit'>kcal</div>"
+            f"<div class='cal-val' style='color:{text_color};'>{net:,}</div>"
+            f"{detail}"
             f"</td>"
         )
     html += "</tr>"
