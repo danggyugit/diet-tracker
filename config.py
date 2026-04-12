@@ -9,7 +9,7 @@ KST = ZoneInfo("Asia/Seoul")
 def today_kst() -> datetime.date:
     return datetime.datetime.now(KST).date()
 
-GEMINI_MODEL = "gemini-2.0-flash-lite"
+GEMINI_MODEL = "gemini-2.0-flash"
 
 ALLOWED_EXTENSIONS = {"jpg", "jpeg", "png"}
 MAX_FILE_SIZE = 10 * 1024 * 1024
