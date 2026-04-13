@@ -64,12 +64,12 @@ def _get_client() -> genai.Client:
 
 
 def _call_api(func):
-    """API 호출 래퍼. 429 에러 시 친절한 메시지로 변환."""
+    """API 호출 래퍼. 429 에러 시 친절한 메시지 + 모델명 표시."""
     try:
         return func()
     except Exception as e:
         if "429" in str(e):
-            raise RuntimeError("AI 요청 한도 초과. 잠시 후(1~2분) 다시 시도해 주세요.") from e
+            raise RuntimeError(f"AI 요청 한도 초과 (모델: {GEMINI_MODEL}). 잠시 후(1~2분) 다시 시도해 주세요.") from e
         raise
 
 
