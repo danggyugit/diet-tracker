@@ -10,7 +10,7 @@ def today_kst() -> datetime.date:
     return datetime.datetime.now(KST).date()
 
 # AI 모델 (Groq)
-VISION_MODEL = "llama-3.2-90b-vision-preview"
+VISION_MODEL = "meta-llama/llama-4-scout-17b-16e-instruct"
 TEXT_MODEL = "llama-3.3-70b-versatile"
 
 ALLOWED_EXTENSIONS = {"jpg", "jpeg", "png"}
