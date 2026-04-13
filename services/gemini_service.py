@@ -6,16 +6,12 @@
 
 import re
 import json
-import time
 
 import streamlit as st
 from google import genai
 from google.genai import types
 
 from config import GEMINI_MODEL
-
-MAX_RETRIES = 2
-RETRY_WAIT = 40  # 초
 
 IMAGE_PROMPT = """다음 음식 사진을 분석하여 JSON만 반환하세요. 다른 텍스트는 절대 포함하지 마세요.
 혼합 음식(예: 김밥, 비빔밥)은 하나의 항목으로 처리하세요.
@@ -67,16 +63,14 @@ def _get_client() -> genai.Client:
     return genai.Client(api_key=api_key)
 
 
-def _call_with_retry(func):
-    """429 에러 시 자동 재시도."""
-    for attempt in range(MAX_RETRIES + 1):
-        try:
-            return func()
-        except Exception as e:
-            if "429" in str(e) and attempt < MAX_RETRIES:
-                time.sleep(RETRY_WAIT)
-                continue
-            raise
+def _call_api(func):
+    """API 호출 래퍼. 429 에러 시 친절한 메시지로 변환."""
+    try:
+        return func()
+    except Exception as e:
+        if "429" in str(e):
+            raise RuntimeError("AI 요청 한도 초과. 잠시 후(1~2분) 다시 시도해 주세요.") from e
+        raise
 
 
 def _parse_json(raw_text: str) -> dict:
@@ -105,7 +99,7 @@ def analyze_food_image(image_bytes: bytes, media_type: str = "image/jpeg") -> di
             ],
         )
         return _parse_json(response.text)
-    return _call_with_retry(_call)
+    return _call_api(_call)
 
 
 def estimate_food_nutrition(food_name: str) -> dict:
@@ -117,7 +111,7 @@ def estimate_food_nutrition(food_name: str) -> dict:
             contents=[MANUAL_PROMPT.format(food_name=food_name)],
         )
         return _parse_json(response.text)
-    return _call_with_retry(_call)
+    return _call_api(_call)
 
 
 RECOMMEND_PROMPT = """당신은 다이어트 식단 전문가입니다. 아래 조건에 맞는 식단을 추천해 주세요.
@@ -209,7 +203,7 @@ def recommend_meals(profile: dict, daily_budget: int,
     def _call():
         response = client.models.generate_content(model=GEMINI_MODEL, contents=[prompt])
         return _parse_json(response.text)
-    return _call_with_retry(_call)
+    return _call_api(_call)
 
 
 def estimate_multiple_foods(food_lines: list[str]) -> list[dict]:
@@ -228,4 +222,4 @@ def estimate_multiple_foods(food_lines: list[str]) -> list[dict]:
             contents=[MULTI_PROMPT.format(food_list=numbered)],
         )
         return _parse_json_array(response.text)
-    return _call_with_retry(_call)
+    return _call_api(_call)
