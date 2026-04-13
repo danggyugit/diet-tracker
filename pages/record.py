@@ -322,11 +322,13 @@ with st.form("record_form"):
 
 if submitted:
     pending = []
+    has_error = False
 
     # 사진 분석
     if uploaded:
         if uploaded.size > MAX_FILE_SIZE:
             st.error("10MB 이하만 가능")
+            has_error = True
         else:
             st.image(uploaded, width=200)
             ext = uploaded.name.rsplit(".", 1)[-1].lower()
@@ -337,6 +339,7 @@ if submitted:
                 except Exception as e:
                     st.error(f"사진 분석 오류: {e}")
                     result = None
+                    has_error = True
             if result and not result.get("error") and result.get("foods"):
                 for f in result["foods"]:
                     f["source"] = "ai"
@@ -355,6 +358,7 @@ if submitted:
                 pending.extend(estimated)
             except Exception as e:
                 st.error(f"추정 실패: {e}")
+                has_error = True
 
     # 즐겨찾기 선택 음식
     if selected_favs:
@@ -389,9 +393,12 @@ if submitted:
         save_meals(email, date_str, meal_type, pending)
         total = sum(f.get("calories", 0) * f.get("quantity", 1) for f in pending)
         st.success(f"💾 {meal_type} {len(pending)}개 음식 ({total:,.0f}kcal) + 체중 {today_weight}kg 저장!")
-    else:
+    elif not has_error:
         st.success(f"💾 체중 {today_weight}kg 기록 완료!")
-    st.rerun()
+
+    # 에러 없을 때만 rerun (에러 메시지 유지)
+    if not has_error:
+        st.rerun()
 
 # ═══════════════════════════════════════════════════════════════
 # 운동 기록 (폼 밖 — multiselect 즉시 반응)
