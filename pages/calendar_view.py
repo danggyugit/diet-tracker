@@ -15,7 +15,7 @@ from services.sheets_service import (
     get_daily_totals, get_meals_for_date, get_profile, get_memo,
     get_latest_weight, get_daily_burned,
 )
-from services.calorie_service import calc_bmr, calc_tdee, calc_daily_deficit
+from services.calorie_service import calc_bmr, calc_tdee
 
 email = require_auth()
 st.title("📅 캘린더")
@@ -31,17 +31,8 @@ bmr = calc_bmr(
 )
 tdee = calc_tdee(bmr, profile.get("activity_level", "보통활동"))
 
-target_cal = int(profile.get("target_calories", 0))
-target_wt = float(profile.get("target_weight", 0))
-target_dt = profile.get("target_date", "")
-
-if target_cal > 0:
-    target = target_cal
-elif target_wt > 0 and target_dt:
-    deficit = calc_daily_deficit(latest_weight, target_wt, target_dt)
-    target = round(tdee - deficit["deficit_per_day"])
-else:
-    target = round(tdee)
+deficit_level = int(profile.get("deficit_level", 700))
+target = round(tdee - deficit_level)
 
 # ─── 월/년 네비게이터 ────────────────────────────────────────
 if "cal_year" not in st.session_state:

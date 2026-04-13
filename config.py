@@ -60,6 +60,7 @@ PROFILES_HEADERS = [
     "email", "gender", "age", "height", "weight",
     "activity_level", "target_calories",
     "target_weight", "target_date",
+    "deficit_level",
     "updated_at",
 ]
 MEMOS_HEADERS = ["email", "date", "condition", "memo", "created_at"]

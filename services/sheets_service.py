@@ -85,11 +85,12 @@ def save_profile(email: str, data: dict) -> None:
         data.get("target_calories", 0),
         data.get("target_weight", 0),
         data.get("target_date", ""),
+        data.get("deficit_level", 700),
         now,
     ]
 
     if row_idx:
-        ws.update(f"A{row_idx}:J{row_idx}", [row])
+        ws.update(f"A{row_idx}:K{row_idx}", [row])
     else:
         ws.append_row(row)
 

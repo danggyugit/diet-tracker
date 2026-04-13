@@ -17,7 +17,7 @@ from config import (
 )
 from services.auth_service import require_auth
 from services.gemini_service import analyze_food_image, estimate_multiple_foods
-from services.calorie_service import calc_bmr, calc_tdee, calc_exercise_plan, calc_daily_deficit
+from services.calorie_service import calc_bmr, calc_tdee, calc_exercise_plan
 from services.sheets_service import (
     get_profile, get_meals_for_date, save_meals, delete_meal_row, update_meal_row,
     get_latest_weight, save_weight, get_daily_totals,
@@ -50,20 +50,18 @@ bmr = calc_bmr(
 )
 tdee = calc_tdee(bmr, profile.get("activity_level", "보통활동"))
 
-target_cal = int(profile.get("target_calories", 0))
-target_wt = float(profile.get("target_weight", 0))
-target_dt = profile.get("target_date", "")
+# 감량 강도 기반 일일 목표
+deficit_level = int(profile.get("deficit_level", 700))
+daily_budget = round(tdee - deficit_level)
 SAFETY_FLOOR = 1200
-
-if target_cal > 0:
-    daily_budget = target_cal
-elif target_wt > 0 and target_dt:
-    deficit = calc_daily_deficit(latest_weight, target_wt, target_dt)
-    daily_budget = round(tdee - deficit["deficit_per_day"])
-else:
-    daily_budget = round(tdee)
-
 is_below_safety = daily_budget < SAFETY_FLOOR
+
+# 체중 기반 영양소 목표
+target_protein = round(latest_weight * 1.3)
+target_fat = round(daily_budget * 0.30 / 9)
+target_carbs = round((daily_budget - target_protein * 4 - target_fat * 9) / 4)
+if target_carbs < 0:
+    target_carbs = 50
 
 # ═══════════════════════════════════════════════════════════════
 # 1. 날짜
@@ -122,12 +120,6 @@ if is_below_safety:
     st.caption(f"⚠️ 일일 목표({daily_budget:,})가 안전 권장량({SAFETY_FLOOR:,}) 미만")
 
 # ─── 오늘 영양소 (목표 대비 섭취량 바) ────────────────────────
-# 매크로 목표: 탄 50%, 단 30%, 지 20% (1g 탄=4kcal, 단=4kcal, 지=9kcal)
-macro_budget = max(daily_budget, 100)
-target_carbs = round(macro_budget * 0.50 / 4)
-target_protein = round(macro_budget * 0.30 / 4)
-target_fat = round(macro_budget * 0.20 / 9)
-
 t_carbs = float(today_totals["total_carbs"].sum()) if not today_totals.empty and "total_carbs" in today_totals.columns else 0
 t_protein = float(today_totals["total_protein"].sum()) if not today_totals.empty and "total_protein" in today_totals.columns else 0
 t_fat = float(today_totals["total_fat"].sum()) if not today_totals.empty and "total_fat" in today_totals.columns else 0
@@ -243,7 +235,7 @@ if t_carbs + t_protein + t_fat > 0:
         )
     label_html += "</div>"
     st.markdown(label_html, unsafe_allow_html=True)
-    st.caption(f"목표 비율 — 탄 50% ({target_carbs}g) · 단 30% ({target_protein}g) · 지 20% ({target_fat}g)")
+    st.caption(f"목표 — 탄 {target_carbs}g · 단 {target_protein}g (체중×1.3) · 지 {target_fat}g (30%)")
 else:
     st.caption("오늘 식사 기록이 없습니다.")
 
