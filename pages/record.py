@@ -51,7 +51,10 @@ bmr = calc_bmr(
 tdee = calc_tdee(bmr, profile.get("activity_level", "보통활동"))
 
 # 감량 강도 기반 일일 목표
-deficit_level = int(profile.get("deficit_level", 700))
+try:
+    deficit_level = int(profile.get("deficit_level") or 700)
+except (ValueError, TypeError):
+    deficit_level = 700
 daily_budget = round(tdee - deficit_level)
 SAFETY_FLOOR = 1200
 is_below_safety = daily_budget < SAFETY_FLOOR

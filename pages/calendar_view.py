@@ -31,7 +31,10 @@ bmr = calc_bmr(
 )
 tdee = calc_tdee(bmr, profile.get("activity_level", "보통활동"))
 
-deficit_level = int(profile.get("deficit_level", 700))
+try:
+    deficit_level = int(profile.get("deficit_level") or 700)
+except (ValueError, TypeError):
+    deficit_level = 700
 target = round(tdee - deficit_level)
 
 # ─── 월/년 네비게이터 ────────────────────────────────────────
