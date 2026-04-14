@@ -28,6 +28,15 @@ ACTIVITY_MULTIPLIERS: dict[str, float] = {
     "매우활발": 1.9,
 }
 
+# 활동 수준별 단백질 계수 (g/kg)
+PROTEIN_MULTIPLIERS: dict[str, float] = {
+    "비활동": 1.0,
+    "가벼운활동": 1.2,
+    "보통활동": 1.3,
+    "활발한활동": 1.6,
+    "매우활발": 1.8,
+}
+
 EXERCISE_TABLE = [
     {"name": "걷기 (빠른 걸음)", "met": 4.5, "category": "유산소", "icon": "🚶"},
     {"name": "달리기 (6km/h)",   "met": 9.8, "category": "유산소", "icon": "🏃"},

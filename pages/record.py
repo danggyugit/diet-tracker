@@ -13,7 +13,7 @@ import streamlit as st
 
 from config import (
     MEAL_TYPES, MAX_FILE_SIZE, PLOT_CFG, CONDITION_OPTIONS,
-    EXERCISE_OPTIONS, WATER_TARGET_ML,
+    EXERCISE_OPTIONS, WATER_TARGET_ML, PROTEIN_MULTIPLIERS,
 )
 from services.auth_service import require_auth
 from services.gemini_service import analyze_food_image, estimate_multiple_foods
@@ -56,8 +56,10 @@ daily_budget = round(tdee - deficit_level)
 SAFETY_FLOOR = 1200
 is_below_safety = daily_budget < SAFETY_FLOOR
 
-# 체중 기반 영양소 목표
-target_protein = round(latest_weight * 1.3)
+# 체중 + 활동 수준 기반 영양소 목표
+activity = profile.get("activity_level", "보통활동")
+protein_mult = PROTEIN_MULTIPLIERS.get(activity, 1.3)
+target_protein = round(latest_weight * protein_mult)
 target_fat = round(daily_budget * 0.30 / 9)
 target_carbs = round((daily_budget - target_protein * 4 - target_fat * 9) / 4)
 if target_carbs < 0:
@@ -235,7 +237,7 @@ if t_carbs + t_protein + t_fat > 0:
         )
     label_html += "</div>"
     st.markdown(label_html, unsafe_allow_html=True)
-    st.caption(f"목표 — 탄 {target_carbs}g · 단 {target_protein}g (체중×1.3) · 지 {target_fat}g (30%)")
+    st.caption(f"목표 — 탄 {target_carbs}g · 단 {target_protein}g (체중×{protein_mult}) · 지 {target_fat}g (30%)")
 else:
     st.caption("오늘 식사 기록이 없습니다.")
 

@@ -4,7 +4,7 @@ import datetime
 
 import streamlit as st
 
-from config import ACTIVITY_MULTIPLIERS, today_kst
+from config import ACTIVITY_MULTIPLIERS, PROTEIN_MULTIPLIERS, today_kst
 from services.auth_service import require_auth
 from services.sheets_service import get_profile, save_profile, get_latest_weight
 from services.calorie_service import calc_bmr, calc_tdee
@@ -111,8 +111,9 @@ bmr = calc_bmr(weight, height, age, gender)
 tdee = calc_tdee(bmr, activity_level)
 daily_target = round(tdee - deficit_level)
 
-# 체중 기반 영양소 목표
-protein_g = round(weight * 1.3)
+# 체중 + 활동 수준 기반 영양소 목표
+protein_mult = PROTEIN_MULTIPLIERS.get(activity_level, 1.3)
+protein_g = round(weight * protein_mult)
 fat_g = round(daily_target * 0.30 / 9)
 protein_cal = protein_g * 4
 fat_cal = fat_g * 9
@@ -131,11 +132,11 @@ st.subheader("영양소 목표 (체중 기반)")
 
 n1, n2, n3 = st.columns(3)
 n1.metric("🍚 탄수화물", f"{carbs_g}g", delta=f"{round(carbs_g*4/daily_target*100)}%")
-n2.metric("🥩 단백질", f"{protein_g}g", delta=f"체중×1.3g")
+n2.metric("🥩 단백질", f"{protein_g}g", delta=f"체중×{protein_mult}g")
 n3.metric("🧈 지방", f"{fat_g}g", delta=f"30%")
 
 st.caption(
-    f"단백질: {weight:.0f}kg × 1.3g = {protein_g}g ({protein_cal}kcal) · "
+    f"단백질: {weight:.0f}kg × {protein_mult}g = {protein_g}g ({protein_cal}kcal) · "
     f"지방: {daily_target:,} × 30% ÷ 9 = {fat_g}g ({fat_cal}kcal) · "
     f"탄수화물: 나머지 = {carbs_g}g ({carbs_g*4}kcal)"
 )
