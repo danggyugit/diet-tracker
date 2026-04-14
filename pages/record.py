@@ -31,12 +31,14 @@ from services.sheets_service import (
 email = require_auth()
 
 # ─── 세션 상태 ───────────────────────────────────────────────
-if "pending_foods" not in st.session_state:
-    st.session_state.pending_foods = []
 if "editing_key" not in st.session_state:
     st.session_state.editing_key = None
 if "editing_ex_key" not in st.session_state:
     st.session_state.editing_ex_key = None
+if "form_version" not in st.session_state:
+    st.session_state.form_version = 0
+if "ex_form_version" not in st.session_state:
+    st.session_state.ex_form_version = 0
 
 # ─── 프로필 + TDEE ───────────────────────────────────────────
 profile = get_profile(email) or {}
@@ -256,7 +258,7 @@ existing_memo_text = existing_memo.get("memo", "") if existing_memo else ""
 favorites = get_favorites(email)
 fav_names = [f"{f['food_name']} ({f.get('calories', 0)}kcal)" for f in favorites] if favorites else []
 
-with st.form("record_form"):
+with st.form(f"record_form_{st.session_state.form_version}"):
     # 체중
     today_weight = st.number_input(
         "⚖️ 오늘 체중 (kg)", min_value=30.0, max_value=200.0,
@@ -393,8 +395,9 @@ if submitted:
     elif not has_error:
         st.success(f"💾 체중 {today_weight}kg 기록 완료!")
 
-    # 에러 없을 때만 rerun (에러 메시지 유지)
+    # 에러 없을 때만 폼 초기화 + rerun
     if not has_error:
+        st.session_state.form_version += 1
         st.rerun()
 
 # ═══════════════════════════════════════════════════════════════
@@ -404,9 +407,10 @@ if submitted:
 st.divider()
 st.markdown("**🏃 운동 기록** (여러 개 선택 가능)")
 ex_display = [f"{e['icon']} {e['name']}" for e in EXERCISE_OPTIONS]
+ev = st.session_state.ex_form_version
 selected_exercises = st.multiselect(
     "운동 선택", ex_display,
-    key="ex_multi", label_visibility="collapsed",
+    key=f"ex_multi_{ev}", label_visibility="collapsed",
 )
 
 if selected_exercises:
@@ -416,7 +420,7 @@ if selected_exercises:
         dur = st.number_input(
             f"{sel_ex} 시간 (분)",
             min_value=5, max_value=300, value=30, step=5,
-            key=f"exdur_{idx}",
+            key=f"exdur_{idx}_{ev}",
         )
         ex_durations[idx] = dur
 
@@ -427,6 +431,7 @@ if selected_exercises:
             save_exercise(email, date_str, ex_info["name"], dur, met, latest_weight)
             cal_burned = round(met * latest_weight * dur / 60)
             st.success(f"{ex_info['icon']} {ex_info['name']} {dur}분 ({cal_burned}kcal) 저장!")
+        st.session_state.ex_form_version += 1
         st.rerun()
 
 # ═══════════════════════════════════════════════════════════════
