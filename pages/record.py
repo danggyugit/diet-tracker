@@ -282,7 +282,7 @@ with st.form(f"record_form_{st.session_state.form_version}"):
     manual_text = st.text_area(
         "음식 목록",
         placeholder="연어스테이크 1인분\n함박스테이크 반인분\n와인 1병",
-        height=100, key="m_text", label_visibility="collapsed",
+        height=100, key=f"m_text_{st.session_state.form_version}", label_visibility="collapsed",
     )
 
     # 즐겨찾기 선택
@@ -292,7 +292,7 @@ with st.form(f"record_form_{st.session_state.form_version}"):
         selected_favs = st.multiselect(
             "음식 선택 (복수 가능)",
             fav_names,
-            key="fav_select", label_visibility="collapsed",
+            key=f"fav_select_{st.session_state.form_version}", label_visibility="collapsed",
         )
     else:
         st.caption("즐겨찾기가 비어있습니다. 설정 > 즐겨찾기에서 등록하세요.")
@@ -302,7 +302,7 @@ with st.form(f"record_form_{st.session_state.form_version}"):
     st.markdown("---")
     today_water = get_water_log(email, date_str)
     st.markdown(f"**💧 물 섭취** (오늘: {today_water}ml / {WATER_TARGET_ML}ml)")
-    water_ml = st.number_input("추가 섭취량 (ml)", min_value=0, max_value=2000, value=0, step=100, key="water")
+    water_ml = st.number_input("추가 섭취량 (ml)", min_value=0, max_value=2000, value=0, step=100, key=f"water_{st.session_state.form_version}")
 
     # 컨디션/메모
     st.markdown("---")
