@@ -1,12 +1,16 @@
 """👤 프로필 페이지 — 신체정보 + 감량 강도 + BMR/TDEE/영양소 목표."""
 
 import datetime
+import io
 
 import streamlit as st
 
 from config import ACTIVITY_MULTIPLIERS, PROTEIN_MULTIPLIERS, today_kst
 from services.auth_service import require_auth
-from services.sheets_service import get_profile, save_profile, get_latest_weight
+from services.sheets_service import (
+    get_profile, save_profile, get_latest_weight,
+    get_meals, get_weight_log, get_exercise_log,
+)
 from services.calorie_service import calc_bmr, calc_tdee
 
 email = require_auth()
@@ -147,3 +151,69 @@ if submitted:
     })
     st.success("프로필이 저장되었습니다!")
     st.rerun()
+
+# ═══════════════════════════════════════════════════════════════
+# 데이터 내보내기
+# ═══════════════════════════════════════════════════════════════
+
+st.divider()
+st.markdown("#### 📥 내 데이터 내보내기")
+st.caption("본인의 식단·체중·운동 기록을 CSV 파일로 다운로드합니다.")
+
+ec1, ec2 = st.columns(2)
+with ec1:
+    export_start = st.date_input(
+        "시작일", value=today_kst() - datetime.timedelta(days=30),
+        key="export_start",
+    )
+with ec2:
+    export_end = st.date_input("종료일", value=today_kst(), key="export_end")
+
+ebtn1, ebtn2, ebtn3 = st.columns(3)
+
+# 식단 기록
+meals_df = get_meals(email, export_start.isoformat(), export_end.isoformat())
+if not meals_df.empty:
+    meals_csv = meals_df.to_csv(index=False).encode("utf-8-sig")
+    ebtn1.download_button(
+        "🍽️ 식단 기록",
+        data=meals_csv,
+        file_name=f"diet_meals_{export_start}_{export_end}.csv",
+        mime="text/csv",
+        use_container_width=True,
+    )
+else:
+    ebtn1.button("🍽️ 식단 없음", disabled=True, use_container_width=True)
+
+# 체중 기록
+weight_df = get_weight_log(email, export_start.isoformat(), export_end.isoformat())
+if not weight_df.empty:
+    weight_csv = weight_df.to_csv(index=False).encode("utf-8-sig")
+    ebtn2.download_button(
+        "⚖️ 체중 기록",
+        data=weight_csv,
+        file_name=f"diet_weight_{export_start}_{export_end}.csv",
+        mime="text/csv",
+        use_container_width=True,
+    )
+else:
+    ebtn2.button("⚖️ 체중 없음", disabled=True, use_container_width=True)
+
+# 운동 기록
+ex_df = get_exercise_log(email, export_start.isoformat(), export_end.isoformat())
+if not ex_df.empty:
+    ex_csv = ex_df.to_csv(index=False).encode("utf-8-sig")
+    ebtn3.download_button(
+        "🏃 운동 기록",
+        data=ex_csv,
+        file_name=f"diet_exercise_{export_start}_{export_end}.csv",
+        mime="text/csv",
+        use_container_width=True,
+    )
+else:
+    ebtn3.button("🏃 운동 없음", disabled=True, use_container_width=True)
+
+st.caption(
+    "💡 CSV 파일은 Excel/Numbers/Google Sheets에서 열 수 있으며, "
+    "BOM 포함 UTF-8로 저장되어 한글이 깨지지 않습니다."
+)

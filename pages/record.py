@@ -45,6 +45,25 @@ for key, default in [
 # ═══════════════════════════════════════════════════════════════
 
 profile = get_profile(email) or {}
+
+# ─── 첫 사용자 온보딩 ──────────────────────────────────────
+if not profile:
+    st.markdown("## 👋 환영합니다!")
+    st.markdown(
+        "식단 기록을 시작하기 전에 **프로필을 먼저 설정**해 주세요.  \n"
+        "키·체중·활동 수준을 입력하면 개인 맞춤 칼로리 목표가 자동으로 계산됩니다."
+    )
+    st.info(
+        "⏱️ 1분이면 설정 완료!\n\n"
+        "**왜 프로필 설정이 먼저 필요한가요?**\n"
+        "- 체중/활동량 기반으로 하루 섭취 목표 칼로리 계산\n"
+        "- 단백질/탄수화물/지방 목표 영양소 자동 산출\n"
+        "- 감량 속도 예측 및 목표 도달일 계산"
+    )
+    if st.button("👤 프로필 설정하러 가기", type="primary", use_container_width=True):
+        st.switch_page("pages/profile.py")
+    st.stop()
+
 latest_weight = get_latest_weight(email) or float(profile.get("weight", 70))
 bmr = calc_bmr(latest_weight, float(profile.get("height", 170)),
                int(profile.get("age", 30)), profile.get("gender", "남성"))

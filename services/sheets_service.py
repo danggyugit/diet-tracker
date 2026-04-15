@@ -29,9 +29,21 @@ SCOPES = [
 
 @st.cache_resource
 def _get_client() -> gspread.Client:
-    creds_info = dict(st.secrets["gcp_service_account"])
-    creds = Credentials.from_service_account_info(creds_info, scopes=SCOPES)
-    return gspread.authorize(creds)
+    try:
+        creds_info = dict(st.secrets["gcp_service_account"])
+        creds = Credentials.from_service_account_info(creds_info, scopes=SCOPES)
+        return gspread.authorize(creds)
+    except KeyError:
+        raise RuntimeError(
+            "⚠️ 서비스 설정 오류\n\n"
+            "Google Sheets 연결 정보가 설정되지 않았습니다. 관리자에게 문의해 주세요."
+        )
+    except Exception as e:
+        raise RuntimeError(
+            f"⚠️ Google Sheets 인증 실패\n\n"
+            f"잠시 후 다시 시도해 주세요. 문제가 지속되면 로그아웃 후 재로그인해 주세요.\n\n"
+            f"상세: {str(e)[:100]}"
+        )
 
 
 @st.cache_resource
