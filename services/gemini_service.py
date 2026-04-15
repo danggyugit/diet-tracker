@@ -7,6 +7,7 @@
 
 import re
 import json
+import time
 
 import streamlit as st
 from google import genai
@@ -55,13 +56,20 @@ def _get_client() -> genai.Client:
 
 
 def _call_api(func):
-    """API 호출 래퍼. 429 에러 시 친절한 메시지."""
-    try:
-        return func()
-    except Exception as e:
-        if "429" in str(e) or "rate_limit" in str(e).lower():
-            raise RuntimeError("AI 요청 한도 초과. 잠시 후(1~2분) 다시 시도해 주세요.") from e
-        raise
+    """API 호출 래퍼. 503 서버 과부하는 자동 재시도, 429는 친절한 메시지."""
+    for attempt in range(3):
+        try:
+            return func()
+        except Exception as e:
+            err_str = str(e)
+            if "503" in err_str or "UNAVAILABLE" in err_str:
+                if attempt < 2:
+                    time.sleep(3 * (attempt + 1))
+                    continue
+                raise RuntimeError("AI 서버 과부하로 응답이 없습니다. 1~2분 후 다시 시도해 주세요.") from e
+            if "429" in err_str or "rate_limit" in err_str.lower():
+                raise RuntimeError("AI 요청 한도 초과. 잠시 후(1~2분) 다시 시도해 주세요.") from e
+            raise
 
 
 def _parse_json(raw_text: str) -> dict:
