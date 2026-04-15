@@ -468,11 +468,18 @@ else:
                 with st.form(f"edit_form_{row_key}"):
                     st.markdown(f"**{row['food_name']}** 수정")
                     ec1, ec2 = st.columns(2)
-                    edit_cal = ec1.number_input("칼로리", value=int(row["calories"]), min_value=0, key=f"ecal_{row_key}")
+                    edit_cal = ec1.number_input("칼로리 (kcal)", value=int(row["calories"]), min_value=0, key=f"ecal_{row_key}")
                     edit_qty = ec2.number_input("인분", value=float(row["quantity"]), min_value=0.5, max_value=10.0, step=0.5, key=f"eqty_{row_key}")
+                    ec3, ec4, ec5 = st.columns(3)
+                    edit_carbs = ec3.number_input("탄(g)", value=int(row.get("carbs", 0)), min_value=0, key=f"ecarbs_{row_key}")
+                    edit_protein = ec4.number_input("단(g)", value=int(row.get("protein", 0)), min_value=0, key=f"eprot_{row_key}")
+                    edit_fat = ec5.number_input("지(g)", value=int(row.get("fat", 0)), min_value=0, key=f"efat_{row_key}")
                     bc1, bc2 = st.columns(2)
                     if bc1.form_submit_button("저장", use_container_width=True):
-                        update_meal_row(email, date_str, row["food_name"], str(row.get("created_at", "")), edit_cal, edit_qty)
+                        update_meal_row(
+                            email, date_str, row["food_name"], str(row.get("created_at", "")),
+                            edit_cal, edit_qty, edit_carbs, edit_protein, edit_fat,
+                        )
                         st.session_state.editing_key = None
                         st.rerun()
                     if bc2.form_submit_button("취소", use_container_width=True):
@@ -483,6 +490,11 @@ else:
                     f"**{row['food_name']}** {row.get('amount', '')} · "
                     f"<span style='color:#94A3B8;'>"
                     f"{int(row['calories'])}kcal x {row['quantity']}인분 = {int(row['total_cal'])}kcal"
+                    f"</span>  \n"
+                    f"<span style='font-size:12px;color:#64748B;'>"
+                    f"🍚 탄 {int(row.get('carbs', 0))}g · "
+                    f"🥩 단 {int(row.get('protein', 0))}g · "
+                    f"🧈 지 {int(row.get('fat', 0))}g"
                     f"</span>",
                     unsafe_allow_html=True,
                 )

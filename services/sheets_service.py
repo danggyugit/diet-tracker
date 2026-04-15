@@ -159,8 +159,9 @@ def delete_meal_row(email: str, date: str, food_name: str, created_at: str) -> b
 
 
 def update_meal_row(email: str, date: str, food_name: str, created_at: str,
-                    new_calories: int, new_quantity: float) -> bool:
-    """저장된 식사 기록의 칼로리·수량 수정."""
+                    new_calories: int, new_quantity: float,
+                    new_carbs: int = None, new_protein: int = None, new_fat: int = None) -> bool:
+    """저장된 식사 기록의 칼로리/수량/영양소 수정."""
     ws = _get_worksheet(WS_MEALS)
     _ensure_headers(ws, MEALS_HEADERS)
     records = ws.get_all_records()
@@ -169,8 +170,14 @@ def update_meal_row(email: str, date: str, food_name: str, created_at: str,
                 and r.get("food_name") == food_name
                 and str(r.get("created_at", "")) == str(created_at)):
             row_num = i + 2
-            # calories=F, quantity=J, total_cal=K (1-indexed)
+            # calories=F, carbs=G, protein=H, fat=I, quantity=J, total_cal=K
             ws.update(f"F{row_num}", [[new_calories]])
+            if new_carbs is not None:
+                ws.update(f"G{row_num}", [[new_carbs]])
+            if new_protein is not None:
+                ws.update(f"H{row_num}", [[new_protein]])
+            if new_fat is not None:
+                ws.update(f"I{row_num}", [[new_fat]])
             ws.update(f"J{row_num}", [[new_quantity]])
             ws.update(f"K{row_num}", [[round(new_calories * new_quantity)]])
             get_meals.clear()
