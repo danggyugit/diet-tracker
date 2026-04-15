@@ -1,4 +1,4 @@
-"""AI 음식 분석 서비스 (Groq + Llama 3.2 Vision).
+"""AI 음식 분석 서비스 (Google Gemini).
 
 - analyze_food_image: 사진 → 음식 인식 + 칼로리 추정
 - estimate_food_nutrition: 음식명 텍스트 → 영양정보 추정
@@ -7,13 +7,12 @@
 
 import re
 import json
-import base64
 
 import streamlit as st
-from groq import Groq
+from google import genai
+from google.genai import types
 
-VISION_MODEL = "meta-llama/llama-4-scout-17b-16e-instruct"
-TEXT_MODEL = "llama-3.3-70b-versatile"
+GEMINI_MODEL = "gemini-2.5-flash"
 
 IMAGE_PROMPT = """다음 음식 사진을 분석하여 JSON만 반환하세요. 다른 텍스트는 절대 포함하지 마세요.
 혼합 음식(예: 김밥, 비빔밥)은 하나의 항목으로 처리하세요.
@@ -48,11 +47,11 @@ calories는 1인분 기준 칼로리입니다. quantity로 실제 먹은 양을 
 carbs(탄수화물), protein(단백질), fat(지방)은 그램(g) 단위 정수로 추정하세요."""
 
 
-def _get_client() -> Groq:
-    api_key = st.secrets.get("GROQ_API_KEY")
+def _get_client() -> genai.Client:
+    api_key = st.secrets.get("GEMINI_API_KEY")
     if not api_key:
-        raise EnvironmentError("GROQ_API_KEY가 secrets.toml에 설정되지 않았습니다")
-    return Groq(api_key=api_key)
+        raise EnvironmentError("GEMINI_API_KEY가 secrets.toml에 설정되지 않았습니다")
+    return genai.Client(api_key=api_key)
 
 
 def _call_api(func):
@@ -80,24 +79,18 @@ def _parse_json_array(raw_text: str) -> list[dict]:
 
 
 def analyze_food_image(image_bytes: bytes, media_type: str = "image/jpeg") -> dict:
-    """Groq Vision API로 음식 사진 분석."""
+    """Gemini Vision API로 음식 사진 분석."""
     client = _get_client()
-    b64 = base64.b64encode(image_bytes).decode()
 
     def _call():
-        response = client.chat.completions.create(
-            model=VISION_MODEL,
-            messages=[{
-                "role": "user",
-                "content": [
-                    {"type": "image_url", "image_url": {"url": f"data:{media_type};base64,{b64}"}},
-                    {"type": "text", "text": IMAGE_PROMPT},
-                ],
-            }],
-            temperature=0.1,
-            max_tokens=2000,
+        response = client.models.generate_content(
+            model=GEMINI_MODEL,
+            contents=[
+                types.Part.from_bytes(data=image_bytes, mime_type=media_type),
+                IMAGE_PROMPT,
+            ],
         )
-        return _parse_json(response.choices[0].message.content)
+        return _parse_json(response.text)
     return _call_api(_call)
 
 
@@ -116,13 +109,10 @@ def estimate_food_nutrition(food_name: str) -> dict:
 carbs(탄수화물), protein(단백질), fat(지방)은 그램(g) 단위 정수로 추정하세요."""
 
     def _call():
-        response = client.chat.completions.create(
-            model=TEXT_MODEL,
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.1,
-            max_tokens=500,
+        response = client.models.generate_content(
+            model=GEMINI_MODEL, contents=[prompt],
         )
-        return _parse_json(response.choices[0].message.content)
+        return _parse_json(response.text)
     return _call_api(_call)
 
 
@@ -132,11 +122,9 @@ def estimate_multiple_foods(food_lines: list[str]) -> list[dict]:
     client = _get_client()
 
     def _call():
-        response = client.chat.completions.create(
-            model=TEXT_MODEL,
-            messages=[{"role": "user", "content": MULTI_PROMPT.format(food_list=numbered)}],
-            temperature=0.1,
-            max_tokens=2000,
+        response = client.models.generate_content(
+            model=GEMINI_MODEL,
+            contents=[MULTI_PROMPT.format(food_list=numbered)],
         )
-        return _parse_json_array(response.choices[0].message.content)
+        return _parse_json_array(response.text)
     return _call_api(_call)
