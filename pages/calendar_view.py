@@ -44,40 +44,41 @@ if "cal_year" not in st.session_state:
 if "cal_month" not in st.session_state:
     st.session_state.cal_month = today_kst().month
 
-# HTML 그리드로 강제 가로 배치 (st.columns 쓰면 모바일에서 세로 쌓임)
+# query_params 기반 네비게이션 (HTML 그리드로 가로 고정)
+qp = st.query_params
+if "cal_nav" in qp:
+    nav_action = qp["cal_nav"]
+    if nav_action == "prev":
+        if st.session_state.cal_month == 1:
+            st.session_state.cal_month = 12
+            st.session_state.cal_year -= 1
+        else:
+            st.session_state.cal_month -= 1
+    elif nav_action == "next":
+        if st.session_state.cal_month == 12:
+            st.session_state.cal_month = 1
+            st.session_state.cal_year += 1
+        else:
+            st.session_state.cal_month += 1
+    del st.query_params["cal_nav"]
+    st.rerun()
+
 nav_html = (
-    f"<div style='display:grid;grid-template-columns:50px 1fr 50px;"
-    f"gap:8px;align-items:center;margin-bottom:12px;'>"
-    f"<button onclick=\"document.querySelector('[data-testid=\\\"baseButton-secondary\\\"][key=\\\"cal_prev\\\"]')?.click()\" "
+    f"<div style='display:grid;grid-template-columns:1fr 2fr 1fr;"
+    f"gap:8px;align-items:center;margin:12px 0;'>"
+    f"<a href='?cal_nav=prev' target='_self' "
     f"style='background:rgba(30,41,59,0.5);border:1px solid rgba(148,163,184,0.2);"
-    f"color:#F8FAFC;padding:10px;border-radius:8px;cursor:pointer;font-size:16px;'>◀</button>"
+    f"color:#F8FAFC;padding:10px 0;border-radius:8px;text-align:center;"
+    f"text-decoration:none;font-size:14px;font-weight:500;'>◀ 이전</a>"
     f"<div style='text-align:center;font-size:20px;font-weight:700;'>"
     f"{st.session_state.cal_year}년 {st.session_state.cal_month}월</div>"
-    f"<button style='background:rgba(30,41,59,0.5);border:1px solid rgba(148,163,184,0.2);"
-    f"color:#F8FAFC;padding:10px;border-radius:8px;cursor:pointer;font-size:16px;'>▶</button>"
+    f"<a href='?cal_nav=next' target='_self' "
+    f"style='background:rgba(30,41,59,0.5);border:1px solid rgba(148,163,184,0.2);"
+    f"color:#F8FAFC;padding:10px 0;border-radius:8px;text-align:center;"
+    f"text-decoration:none;font-size:14px;font-weight:500;'>다음 ▶</a>"
     f"</div>"
 )
-# HTML 버튼은 작동 안 하니 실제 기능은 아래 숨김 Streamlit 버튼으로
-nc1, nc2, nc3 = st.columns([1, 3, 1])
-if nc1.button("◀ 이전", use_container_width=True, key="cal_prev"):
-    if st.session_state.cal_month == 1:
-        st.session_state.cal_month = 12
-        st.session_state.cal_year -= 1
-    else:
-        st.session_state.cal_month -= 1
-    st.rerun()
-nc2.markdown(
-    f"<h3 style='text-align:center;margin:0;line-height:2.2;'>"
-    f"{st.session_state.cal_year}년 {st.session_state.cal_month}월</h3>",
-    unsafe_allow_html=True,
-)
-if nc3.button("다음 ▶", use_container_width=True, key="cal_next"):
-    if st.session_state.cal_month == 12:
-        st.session_state.cal_month = 1
-        st.session_state.cal_year += 1
-    else:
-        st.session_state.cal_month += 1
-    st.rerun()
+st.markdown(nav_html, unsafe_allow_html=True)
 
 year = st.session_state.cal_year
 month = st.session_state.cal_month
@@ -159,9 +160,15 @@ for week in weeks:
 html += "</table>"
 st.markdown(html, unsafe_allow_html=True)
 
-# 범례 - 간결하게
-st.caption(
-    f"🟢 목표 이하 · 🟡 소폭 초과 · 🔴 초과 (목표 {target:,} kcal)"
+# 범례 - 가로 강제 배치
+st.markdown(
+    f"<div style='display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;"
+    f"font-size:11px;color:#94A3B8;text-align:center;margin:8px 0 0;'>"
+    f"<div>🟢 목표 이하</div><div>🟡 소폭 초과</div><div>🔴 초과</div>"
+    f"</div>"
+    f"<div style='text-align:center;font-size:11px;color:#64748B;margin-top:2px;'>"
+    f"목표 {target:,} kcal</div>",
+    unsafe_allow_html=True,
 )
 
 # ═══════════════════════════════════════════════════════════════
@@ -208,9 +215,10 @@ if sel_date_str:
             labels=["탄수화물", "단백질", "지방"],
             values=[t_carbs, t_protein, t_fat],
             marker=dict(colors=["#4ADE80", "#60A5FA", "#FBBF24"]),
-            textinfo="label+percent",
-            textfont=dict(size=13, color="#F8FAFC"),
+            textinfo="percent",
+            textfont=dict(size=14, color="#F8FAFC"),
             hole=0.6,
+            hovertemplate="%{label}: %{value:.0f}g<extra></extra>",
         ))
         fig.update_layout(
             **PLOT_CFG, height=240, showlegend=False,
@@ -226,9 +234,14 @@ if sel_date_str:
         with dc_c:
             st.plotly_chart(fig, use_container_width=True)
 
-        # 영양소 요약 (작게)
-        st.caption(
-            f"🍚 탄 {t_carbs:.0f}g · 🥩 단 {t_protein:.0f}g · 🧈 지 {t_fat:.0f}g"
+        # 영양소 요약 (컬러 라벨 + 값)
+        st.markdown(
+            f"<div style='display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;text-align:center;margin:-10px 0 10px;'>"
+            f"<div><span style='color:#4ADE80;'>● 탄수화물</span><br><b>{t_carbs:.0f}g</b></div>"
+            f"<div><span style='color:#60A5FA;'>● 단백질</span><br><b>{t_protein:.0f}g</b></div>"
+            f"<div><span style='color:#FBBF24;'>● 지방</span><br><b>{t_fat:.0f}g</b></div>"
+            f"</div>",
+            unsafe_allow_html=True,
         )
 
         # 식사별 카드 (컬러바 + 카드형)
