@@ -1,6 +1,7 @@
 """Google Sheets CRUD 서비스 (gspread + Service Account)."""
 
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 
 import gspread
 import pandas as pd
@@ -13,6 +14,12 @@ from config import (
     MEALS_HEADERS, PROFILES_HEADERS, MEMOS_HEADERS, WEIGHT_LOG_HEADERS,
     EXERCISE_LOG_HEADERS, WATER_LOG_HEADERS, FAVORITES_HEADERS,
 )
+
+KST = ZoneInfo("Asia/Seoul")
+
+
+def _now_kst() -> str:
+    return datetime.now(KST).isoformat()
 
 SCOPES = [
     "https://www.googleapis.com/auth/spreadsheets",
@@ -74,7 +81,7 @@ def save_profile(email: str, data: dict) -> None:
             row_idx = i + 2  # 1-indexed + header row
             break
 
-    now = datetime.now().isoformat()
+    now = _now_kst()
     row = [
         email,
         data.get("gender", "남성"),
@@ -118,7 +125,7 @@ def get_meals_for_date(email: str, date: str) -> pd.DataFrame:
 def save_meals(email: str, date: str, meal_type: str, foods: list[dict]) -> None:
     ws = _get_worksheet(WS_MEALS)
     _ensure_headers(ws, MEALS_HEADERS)
-    now = datetime.now().isoformat()
+    now = _now_kst()
 
     rows = []
     for f in foods:
@@ -209,7 +216,7 @@ def save_memo(email: str, date: str, condition: str, memo: str) -> None:
     ws = _get_worksheet(WS_MEMOS)
     _ensure_headers(ws, MEMOS_HEADERS)
     records = ws.get_all_records()
-    now = datetime.now().isoformat()
+    now = _now_kst()
     row = [email, date, condition, memo, now]
 
     row_idx = None
@@ -260,7 +267,7 @@ def save_weight(email: str, date: str, weight: float) -> None:
     ws = _get_worksheet(WS_WEIGHT_LOG)
     _ensure_headers(ws, WEIGHT_LOG_HEADERS)
     records = ws.get_all_records()
-    now = datetime.now().isoformat()
+    now = _now_kst()
     row = [email, date, weight, now]
 
     row_idx = None
@@ -336,7 +343,7 @@ def save_exercise(email: str, date: str, name: str, duration: int, met: float, w
     ws = _get_worksheet(WS_EXERCISE_LOG)
     _ensure_headers(ws, EXERCISE_LOG_HEADERS)
     cal_burned = round(met * weight * duration / 60)
-    ws.append_row([email, date, name, duration, met, cal_burned, datetime.now().isoformat()])
+    ws.append_row([email, date, name, duration, met, cal_burned, _now_kst()])
     get_exercise_log.clear()
 
 
@@ -399,7 +406,7 @@ def get_daily_burned(email: str, date: str) -> float:
 def save_water(email: str, date: str, ml: int) -> None:
     ws = _get_worksheet(WS_WATER_LOG)
     _ensure_headers(ws, WATER_LOG_HEADERS)
-    ws.append_row([email, date, ml, datetime.now().isoformat()])
+    ws.append_row([email, date, ml, _now_kst()])
     get_water_log.clear()
 
 
@@ -455,7 +462,7 @@ def add_favorite(email: str, food: dict) -> None:
             row_idx = i + 2
             new_count = int(r.get("use_count", 0)) + 1
             ws.update(f"H{row_idx}", [[new_count]])
-            ws.update(f"I{row_idx}", [[datetime.now().isoformat()]])
+            ws.update(f"I{row_idx}", [[_now_kst()]])
             get_favorites.clear()
             return
 
@@ -463,7 +470,7 @@ def add_favorite(email: str, food: dict) -> None:
         email, food.get("name", ""), food.get("amount", ""),
         food.get("calories", 0), food.get("carbs", 0),
         food.get("protein", 0), food.get("fat", 0),
-        1, datetime.now().isoformat(),
+        1, _now_kst(),
     ])
     get_favorites.clear()
 
