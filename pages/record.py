@@ -458,7 +458,16 @@ else:
         if meal_df.empty:
             continue
 
-        st.markdown(f"**{mt}** ({meal_df['total_cal'].sum():,.0f} kcal)")
+        mt_carbs = (meal_df["carbs"] * meal_df["quantity"]).sum()
+        mt_protein = (meal_df["protein"] * meal_df["quantity"]).sum()
+        mt_fat = (meal_df["fat"] * meal_df["quantity"]).sum()
+        st.markdown(
+            f"**{mt}** ({meal_df['total_cal'].sum():,.0f} kcal) "
+            f"<span style='font-size:12px;color:#94A3B8;'>"
+            f"· 🍚 {mt_carbs:.0f}g · 🥩 {mt_protein:.0f}g · 🧈 {mt_fat:.0f}g"
+            f"</span>",
+            unsafe_allow_html=True,
+        )
 
         for idx, row in meal_df.iterrows():
             row_key = f"{mt}_{idx}"
