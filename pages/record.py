@@ -21,6 +21,7 @@ from services.gemini_service import analyze_food_image, estimate_multiple_foods
 from services.calorie_service import calc_bmr, calc_tdee, calc_exercise_plan
 from services.sheets_service import (
     get_profile, get_meals_for_date, save_meals, delete_meal_row, update_meal_row,
+    delete_meals_by_type,
     get_latest_weight, save_weight, get_daily_totals,
     save_memo, get_memo,
     save_exercise, get_daily_burned, get_exercise_log,
@@ -85,9 +86,24 @@ target_carbs = max(round((daily_budget - target_protein * 4 - target_fat * 9) / 
 # 상단: 날짜 + 체중
 # ═══════════════════════════════════════════════════════════════
 
+if "selected_date_state" not in st.session_state:
+    st.session_state.selected_date_state = today_kst()
+
 hc1, hc2 = st.columns([1, 1])
 with hc1:
-    selected_date = st.date_input("날짜", value=today_kst())
+    selected_date = st.date_input("날짜", value=st.session_state.selected_date_state, key="date_picker")
+    st.session_state.selected_date_state = selected_date
+    # 날짜 빠른 이동 버튼
+    dc1, dc2, dc3 = st.columns(3)
+    if dc1.button("◀ 어제", use_container_width=True, key="btn_yesterday"):
+        st.session_state.selected_date_state = selected_date - datetime.timedelta(days=1)
+        st.rerun()
+    if dc2.button("오늘", use_container_width=True, key="btn_today"):
+        st.session_state.selected_date_state = today_kst()
+        st.rerun()
+    if dc3.button("내일 ▶", use_container_width=True, key="btn_tomorrow"):
+        st.session_state.selected_date_state = selected_date + datetime.timedelta(days=1)
+        st.rerun()
     date_str = selected_date.isoformat()
 with hc2:
     today_weight = st.number_input(
@@ -501,7 +517,14 @@ if st.session_state.last_deleted_meal:
         st.rerun()
 
 if saved.empty:
-    st.caption(f"{date_str} 저장된 식단 기록이 없습니다.")
+    st.markdown(
+        f"<div style='text-align:center;padding:30px 20px;background:rgba(30,41,59,0.3);border-radius:12px;'>"
+        f"<div style='font-size:48px;'>🍽️</div>"
+        f"<div style='margin-top:8px;color:#94A3B8;'>{date_str} 식단 기록이 없습니다</div>"
+        f"<div style='font-size:12px;color:#64748B;margin-top:4px;'>위의 '식사' 탭에서 음식을 추가해 보세요</div>"
+        f"</div>",
+        unsafe_allow_html=True,
+    )
 else:
     st.markdown(f"#### 📋 {date_str} 저장된 기록")
 
@@ -540,6 +563,28 @@ else:
             f"</div>",
             unsafe_allow_html=True,
         )
+
+        # 식사 유형 일괄 삭제 (확인용 토글)
+        confirm_key = f"confirm_del_{mt}"
+        if confirm_key not in st.session_state:
+            st.session_state[confirm_key] = False
+
+        mbc1, mbc2 = st.columns([5, 1])
+        if not st.session_state[confirm_key]:
+            if mbc2.button(f"전체 삭제", key=f"mass_del_{mt}", use_container_width=True):
+                st.session_state[confirm_key] = True
+                st.rerun()
+        else:
+            mbc1.caption(f"⚠️ {mt} 전체 {len(meal_df)}개를 삭제할까요?")
+            cdc1, cdc2 = st.columns(2)
+            if cdc1.button("확인", key=f"confirm_yes_{mt}", use_container_width=True, type="primary"):
+                count = delete_meals_by_type(email, date_str, mt)
+                st.session_state[confirm_key] = False
+                st.toast(f"🗑️ {mt} {count}개 삭제!", icon="🗑️")
+                st.rerun()
+            if cdc2.button("취소", key=f"confirm_no_{mt}", use_container_width=True):
+                st.session_state[confirm_key] = False
+                st.rerun()
 
         for idx, row in meal_df.iterrows():
             row_key = f"{mt}_{idx}"

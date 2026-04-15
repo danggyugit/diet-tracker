@@ -177,6 +177,24 @@ def delete_meal_row(email: str, date: str, food_name: str, created_at: str) -> b
     return False
 
 
+def delete_meals_by_type(email: str, date: str, meal_type: str) -> int:
+    """특정 식사 유형의 모든 기록 삭제. 삭제된 건수 반환."""
+    ws = _get_worksheet(WS_MEALS)
+    _ensure_headers(ws, MEALS_HEADERS)
+    records = ws.get_all_records()
+    rows_to_delete = []
+    for i, r in enumerate(records):
+        if (r.get("email") == email and r.get("date") == date
+                and r.get("meal_type") == meal_type):
+            rows_to_delete.append(i + 2)
+    # 뒤에서부터 삭제 (인덱스 안 밀리게)
+    for row_num in sorted(rows_to_delete, reverse=True):
+        ws.delete_rows(row_num)
+    if rows_to_delete:
+        get_meals.clear()
+    return len(rows_to_delete)
+
+
 def update_meal_row(email: str, date: str, food_name: str, created_at: str,
                     new_calories: int, new_quantity: float,
                     new_carbs: int = None, new_protein: int = None, new_fat: int = None) -> bool:
