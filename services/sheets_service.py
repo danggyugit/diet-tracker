@@ -296,6 +296,26 @@ def get_daily_totals(email: str, start_date: str, end_date: str) -> pd.DataFrame
     return agg.sort_values("date")
 
 
+def get_recent_foods(email: str, days: int = 3, limit: int = 10) -> pd.DataFrame:
+    """최근 N일 먹은 음식 (중복 제거, 최신순)."""
+    end = datetime.now().strftime("%Y-%m-%d")
+    start = (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%d")
+    df = get_meals(email, start, end)
+    if df.empty:
+        return pd.DataFrame(columns=["food_name", "amount", "calories", "carbs", "protein", "fat"])
+    for c in ["calories", "carbs", "protein", "fat"]:
+        df[c] = pd.to_numeric(df[c], errors="coerce").fillna(0)
+    df = df.sort_values("created_at", ascending=False)
+    unique = df.drop_duplicates(subset=["food_name"]).head(limit)
+    return unique[["food_name", "amount", "calories", "carbs", "protein", "fat"]]
+
+
+def get_yesterday_meals(email: str, date_str: str) -> pd.DataFrame:
+    """어제 식단 전체 반환 (복사용)."""
+    d = datetime.strptime(date_str, "%Y-%m-%d").date() - timedelta(days=1)
+    return get_meals(email, d.isoformat(), d.isoformat())
+
+
 def get_top_foods(email: str, days: int = 30) -> pd.DataFrame:
     end = datetime.now().strftime("%Y-%m-%d")
     start = (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%d")
