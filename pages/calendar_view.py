@@ -114,14 +114,17 @@ def _cell_color(cal_val: int) -> tuple[str, str]:
         return "rgba(239,68,68,0.3)", "#EF4444"
 
 
+sel_date_state = st.session_state.get("cal_sel_date")
+
 html = """
 <style>
 .cal-table { width:100%; border-collapse:separate; border-spacing:3px; table-layout:fixed; }
 .cal-table th { text-align:center; color:#94A3B8; font-size:12px; font-weight:600; padding:4px 0; }
-.cal-table td { border-radius:8px; padding:3px; vertical-align:top; height:80px; }
+.cal-table td { border-radius:8px; padding:3px; vertical-align:top; height:62px; }
 .cal-day { font-size:11px; color:#94A3B8; }
 .cal-val { font-size:13px; font-weight:700; line-height:1.2; }
-.cal-detail { font-size:9px; color:#CBD5E1; line-height:1.3; }
+.cal-detail { font-size:9px; color:#CBD5E1; line-height:1.2; }
+.cal-empty { font-size:14px; color:#475569; text-align:center; margin-top:6px; }
 </style>
 <table class="cal-table">
 <tr><th>월</th><th>화</th><th>수</th><th>목</th><th>금</th><th>토</th><th>일</th></tr>
@@ -138,22 +141,35 @@ for week in weeks:
         eaten = daily_eaten.get(date_key, 0)
         burned = daily_burned_map.get(date_key, 0)
         net = daily_net.get(date_key, 0)
-        bg, text_color = _cell_color(net)
+        has_data = eaten > 0 or burned > 0
+        bg, text_color = _cell_color(net) if has_data else ("rgba(30,41,59,0.25)", "#475569")
         is_today = day == today
-        border = "2px solid #3B82F6" if is_today else "1px solid rgba(148,163,184,0.15)"
-
-        if eaten > 0 and burned > 0:
-            detail = f"<div class='cal-detail'>식{eaten:,}<br>운{burned:,}</div>"
-        elif eaten > 0:
-            detail = f"<div class='cal-detail'>식{eaten:,}</div>"
+        is_selected = sel_date_state == day
+        if is_selected:
+            border = "2px solid #F59E0B"
+        elif is_today:
+            border = "2px solid #3B82F6"
         else:
-            detail = ""
+            border = "1px solid rgba(148,163,184,0.15)"
+
+        if has_data:
+            if eaten > 0 and burned > 0:
+                detail = f"<div class='cal-detail'>식{eaten:,}·운{burned:,}</div>"
+            elif eaten > 0:
+                detail = f"<div class='cal-detail'>식{eaten:,}</div>"
+            else:
+                detail = f"<div class='cal-detail'>운{burned:,}</div>"
+            body = (
+                f"<div class='cal-val' style='color:{text_color};'>{net:,}</div>"
+                f"{detail}"
+            )
+        else:
+            body = "<div class='cal-empty'>·</div>"
 
         html += (
             f"<td style='background:{bg};border:{border};'>"
             f"<div class='cal-day'>{day.day}</div>"
-            f"<div class='cal-val' style='color:{text_color};'>{net:,}</div>"
-            f"{detail}"
+            f"{body}"
             f"</td>"
         )
     html += "</tr>"
@@ -176,10 +192,13 @@ st.markdown(
 # ═══════════════════════════════════════════════════════════════
 
 st.divider()
+_default_sel = today if today.month == month and today.year == year else first_day
+if "cal_sel_date" not in st.session_state or not (first_day <= st.session_state.cal_sel_date <= last_day):
+    st.session_state.cal_sel_date = _default_sel
 sel_date = st.date_input(
     "📋 상세 보기할 날짜",
-    value=today if today.month == month and today.year == year else first_day,
     min_value=first_day, max_value=last_day,
+    key="cal_sel_date",
 )
 sel_date_str = sel_date.isoformat()
 
@@ -187,21 +206,7 @@ if sel_date_str:
     day_meals = get_meals_for_date(email, sel_date_str)
     day_memo = get_memo(email, sel_date_str)
 
-    # 메모 먼저 (위쪽)
-    if day_memo:
-        condition = day_memo.get("condition", "")
-        memo_text = day_memo.get("memo", "")
-        memo_html = f"<div style='background:rgba(139,92,246,0.1);border-left:3px solid #8B5CF6;padding:10px 12px;border-radius:6px;margin:8px 0;'>"
-        memo_html += f"<div style='font-size:13px;color:#A78BFA;font-weight:600;margin-bottom:4px;'>📝 {condition}</div>"
-        if memo_text:
-            memo_html += f"<div style='font-size:13px;color:#CBD5E1;'>{memo_text}</div>"
-        memo_html += "</div>"
-        st.markdown(memo_html, unsafe_allow_html=True)
-
-    if day_meals.empty:
-        if not day_memo:
-            st.info(f"📝 {sel_date_str} 기록이 없습니다.")
-    else:
+    if not day_meals.empty:
         for c in ["total_cal", "carbs", "protein", "fat", "quantity"]:
             day_meals[c] = day_meals[c].apply(lambda x: float(x) if x else 0)
 
@@ -210,14 +215,17 @@ if sel_date_str:
         t_fat = (day_meals["fat"] * day_meals["quantity"]).sum()
         t_cal = day_meals["total_cal"].sum()
 
-        # 도넛 (중앙에 총 칼로리)
+        # 도넛 (중앙에 총 칼로리) — 라벨 안쪽 배치 + 작은 폰트
         fig = go.Figure(go.Pie(
             labels=["탄수화물", "단백질", "지방"],
             values=[t_carbs, t_protein, t_fat],
             marker=dict(colors=["#4ADE80", "#60A5FA", "#FBBF24"]),
             textinfo="percent",
-            textfont=dict(size=14, color="#F8FAFC"),
-            hole=0.6,
+            textposition="inside",
+            insidetextorientation="horizontal",
+            textfont=dict(size=12, color="#0F172A"),
+            hole=0.62,
+            sort=False,
             hovertemplate="%{label}: %{value:.0f}g<extra></extra>",
         ))
         fig.update_layout(
@@ -244,6 +252,21 @@ if sel_date_str:
             unsafe_allow_html=True,
         )
 
+    # 메모 (도넛 아래)
+    if day_memo:
+        condition = day_memo.get("condition", "")
+        memo_text = day_memo.get("memo", "")
+        memo_html = f"<div style='background:rgba(139,92,246,0.1);border-left:3px solid #8B5CF6;padding:10px 12px;border-radius:6px;margin:8px 0;'>"
+        memo_html += f"<div style='font-size:13px;color:#A78BFA;font-weight:600;margin-bottom:4px;'>📝 {condition}</div>"
+        if memo_text:
+            memo_html += f"<div style='font-size:13px;color:#CBD5E1;'>{memo_text}</div>"
+        memo_html += "</div>"
+        st.markdown(memo_html, unsafe_allow_html=True)
+
+    if day_meals.empty:
+        if not day_memo:
+            st.info(f"📝 {sel_date_str} 기록이 없습니다.")
+    else:
         # 식사별 카드 (컬러바 + 카드형)
         MEAL_COLORS = {
             "아침": "#F59E0B", "점심": "#22C55E",
