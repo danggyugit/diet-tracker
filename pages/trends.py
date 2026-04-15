@@ -63,8 +63,11 @@ if totals.empty and weight_log.empty:
     )
     st.stop()
 
-# 핵심 지표 4개
-c1, c2, c3, c4 = st.columns(4)
+# 핵심 지표 4개 (모바일: 2x2, PC: 4x1)
+mr1 = st.columns(2)
+mr2 = st.columns(2)
+c1, c2 = mr1[0], mr1[1]
+c3, c4 = mr2[0], mr2[1]
 
 # 1. 평균 섭취 vs 목표
 if not totals.empty:
@@ -149,23 +152,23 @@ eval_lines = []
 if not totals.empty:
     avg_cal = totals["total_cal"].mean()
     if avg_cal <= target:
-        eval_lines.append("✅ 칼로리 목표 내 유지 중")
+        eval_lines.append("✅ 칼로리 유지")
     elif avg_cal <= target * 1.1:
-        eval_lines.append("🟡 칼로리 목표 근접")
+        eval_lines.append("🟡 칼로리 근접")
     else:
-        eval_lines.append("🔴 칼로리 목표 초과")
+        eval_lines.append("🔴 칼로리 초과")
 
 if not weight_log.empty and len(weight_log) >= 2:
     w_change = float(weight_log.iloc[-1]["weight"]) - float(weight_log.iloc[0]["weight"])
     if w_change < 0:
-        eval_lines.append(f"✅ 체중 {abs(w_change):.1f}kg 감량 중")
+        eval_lines.append(f"✅ {abs(w_change):.1f}kg 감량")
     elif w_change > 0:
-        eval_lines.append(f"🔴 체중 {w_change:.1f}kg 증가")
+        eval_lines.append(f"🔴 {w_change:.1f}kg 증가")
     else:
         eval_lines.append("🟡 체중 유지")
 
 if eval_lines:
-    st.info(f"📝 종합 평가: " + " · ".join(eval_lines))
+    st.info(" · ".join(eval_lines))
 
 # ═══════════════════════════════════════════════════════════════
 # 섹션 2: 진행 상황 (체중 + 칼로리 추이)
@@ -229,10 +232,11 @@ else:
                     st.warning("⚠️ 현재 페이스로는 1년 이상 소요됩니다. 감량 강도를 조정해 보세요.")
 
     fig_weight.update_layout(
-        **PLOT_CFG, height=300,
-        xaxis_title="날짜", yaxis_title="체중 (kg)",
-        margin=dict(l=50, r=20, t=20, b=40),
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+        **PLOT_CFG, height=320,
+        xaxis_title=None, yaxis_title="kg",
+        margin=dict(l=40, r=15, t=30, b=30),
+        xaxis=dict(tickangle=-45, tickfont=dict(size=10)),
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, font=dict(size=11)),
     )
     st.plotly_chart(fig_weight, use_container_width=True)
 
@@ -257,8 +261,10 @@ else:
     )
     fig_line.update_layout(
         **PLOT_CFG, height=280,
-        xaxis_title="날짜", yaxis_title="칼로리 (kcal)",
-        margin=dict(l=50, r=20, t=20, b=40), showlegend=False,
+        xaxis_title=None, yaxis_title="kcal",
+        margin=dict(l=50, r=15, t=20, b=40), showlegend=False,
+        xaxis=dict(tickangle=-45, tickfont=dict(size=10)),
+        bargap=0.3,
     )
     st.plotly_chart(fig_line, use_container_width=True)
 
@@ -346,16 +352,27 @@ if not totals.empty:
     total_g = t_c + t_p + t_f
 
     if total_g > 0:
+        avg_kcal_str = f"{totals['total_cal'].mean():,.0f}"
         fig_pie = go.Figure(go.Pie(
             labels=["탄수화물", "단백질", "지방"],
             values=[t_c, t_p, t_f],
             marker=dict(colors=["#4ADE80", "#60A5FA", "#FBBF24"]),
             textinfo="label+percent",
-            hole=0.5,
+            textfont=dict(size=12),
+            hole=0.55,
         ))
-        fig_pie.update_layout(**PLOT_CFG, height=250, showlegend=False,
-            margin=dict(l=0, r=0, t=0, b=0))
-        st.plotly_chart(fig_pie, use_container_width=True)
+        fig_pie.update_layout(
+            **PLOT_CFG, height=220, showlegend=False,
+            margin=dict(l=0, r=0, t=0, b=0),
+            annotations=[dict(
+                text=f"<b>일평균</b><br>{avg_kcal_str} kcal",
+                x=0.5, y=0.5, font=dict(size=14), showarrow=False,
+            )],
+        )
+        # 도넛을 중앙에 배치 (모바일/PC 모두 적절한 크기)
+        pc_left, pc_center, pc_right = st.columns([1, 2, 1])
+        with pc_center:
+            st.plotly_chart(fig_pie, use_container_width=True)
 
         # 단백질 체크
         pct_p = t_p / total_g * 100
