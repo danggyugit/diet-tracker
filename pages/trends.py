@@ -22,7 +22,7 @@ from services.sheets_service import (
 from services.calorie_service import calc_bmr, calc_tdee
 
 email = require_auth()
-st.title("📊 트렌드 & 인사이트")
+st.title("📊 트렌드")
 
 # ─── 프로필 + 목표 계산 ──────────────────────────────────────
 profile = get_profile(email) or {}
@@ -63,46 +63,34 @@ if totals.empty and weight_log.empty:
     )
     st.stop()
 
-# 핵심 지표 4개 (모바일: 2x2, PC: 4x1)
-mr1 = st.columns(2)
-mr2 = st.columns(2)
-c1, c2 = mr1[0], mr1[1]
-c3, c4 = mr2[0], mr2[1]
+# 지표 데이터 준비
+metric_data = []
 
-# 1. 평균 섭취 vs 목표
+# 1. 평균 섭취
 if not totals.empty:
     avg_cal = totals["total_cal"].mean()
     achievement = (avg_cal / target * 100) if target > 0 else 0
     if 90 <= achievement <= 105:
-        eval_text = "✅ 적정"
+        eval_text, eval_color = "✅ 적정", "#4ADE80"
     elif achievement < 90:
-        eval_text = "⬇️ 부족"
+        eval_text, eval_color = "⬇️ 부족", "#FBBF24"
     else:
-        eval_text = "⚠️ 초과"
-    c1.metric(
-        "평균 섭취",
-        f"{avg_cal:,.0f} kcal",
-        delta=f"{eval_text} (목표 {achievement:.0f}%)",
-        delta_color="off",
-    )
+        eval_text, eval_color = "⚠️ 초과", "#FB7185"
+    metric_data.append(("평균 섭취", f"{avg_cal:,.0f} kcal", eval_text, eval_color))
 else:
-    c1.metric("평균 섭취", "기록 없음")
+    metric_data.append(("평균 섭취", "기록 없음", "", "#64748B"))
 
 # 2. 체중 변화
 if not weight_log.empty and len(weight_log) >= 2:
     w_start = float(weight_log.iloc[0]["weight"])
     w_end = float(weight_log.iloc[-1]["weight"])
     w_change = w_end - w_start
-    c2.metric(
-        "체중 변화",
-        f"{w_end:.1f} kg",
-        delta=f"{w_change:+.1f} kg",
-        delta_color="inverse",
-    )
+    change_color = "#4ADE80" if w_change < 0 else ("#FB7185" if w_change > 0 else "#94A3B8")
+    metric_data.append(("체중 변화", f"{w_end:.1f} kg", f"{w_change:+.1f} kg", change_color))
 else:
-    c2.metric("체중 변화", "2일+ 기록 필요")
+    metric_data.append(("체중 변화", "—", "2일+ 기록 필요", "#64748B"))
 
-# 3. 주당 감량 속도
+# 3. 주당 감량
 if not weight_log.empty and len(weight_log) >= 2:
     w_start = float(weight_log.iloc[0]["weight"])
     w_end = float(weight_log.iloc[-1]["weight"])
@@ -112,40 +100,44 @@ if not weight_log.empty and len(weight_log) >= 2:
     if elapsed > 0:
         weekly = (w_end - w_start) / elapsed * 7
         if -1.0 <= weekly <= 0:
-            eval_text = "✅ 안전"
+            eval_text, eval_color = "✅ 안전", "#4ADE80"
         elif weekly < -1.0:
-            eval_text = "⚠️ 빠름"
+            eval_text, eval_color = "⚠️ 빠름", "#FBBF24"
         elif weekly > 0:
-            eval_text = "⬆️ 증가"
+            eval_text, eval_color = "⬆️ 증가", "#FB7185"
         else:
-            eval_text = "— 유지"
-        c3.metric(
-            "주당 감량",
-            f"{weekly:+.2f} kg",
-            delta=eval_text,
-            delta_color="off",
-        )
+            eval_text, eval_color = "— 유지", "#94A3B8"
+        metric_data.append(("주당 감량", f"{weekly:+.2f} kg", eval_text, eval_color))
     else:
-        c3.metric("주당 감량", "—")
+        metric_data.append(("주당 감량", "—", "", "#64748B"))
 else:
-    c3.metric("주당 감량", "—")
+    metric_data.append(("주당 감량", "—", "", "#64748B"))
 
-# 4. 기록 지속률 (연속 기록)
+# 4. 연속 기록
 streak = get_streak(email)
 if streak >= 30:
-    streak_eval = "🏆 우수"
+    streak_eval, streak_color = "🏆 우수", "#FBBF24"
 elif streak >= 7:
-    streak_eval = "🔥 좋음"
+    streak_eval, streak_color = "🔥 좋음", "#FB7185"
 elif streak >= 3:
-    streak_eval = "✨ 시작"
+    streak_eval, streak_color = "✨ 시작", "#60A5FA"
 else:
-    streak_eval = "⬇️ 저조"
-c4.metric(
-    "연속 기록",
-    f"{streak}일",
-    delta=streak_eval,
-    delta_color="off",
-)
+    streak_eval, streak_color = "⬇️ 저조", "#94A3B8"
+metric_data.append(("연속 기록", f"{streak}일", streak_eval, streak_color))
+
+# HTML 그리드 (모바일 2x2 강제)
+cards_html = "<div style='display:grid;grid-template-columns:1fr 1fr;gap:8px;'>"
+for label, value, delta, color in metric_data:
+    cards_html += (
+        f"<div style='background:rgba(30,41,59,0.5);border-radius:10px;padding:12px;"
+        f"border:1px solid rgba(148,163,184,0.1);'>"
+        f"<div style='font-size:12px;color:#94A3B8;margin-bottom:4px;'>{label}</div>"
+        f"<div style='font-size:20px;font-weight:700;color:#F8FAFC;'>{value}</div>"
+        f"<div style='font-size:12px;color:{color};margin-top:2px;'>{delta}</div>"
+        f"</div>"
+    )
+cards_html += "</div>"
+st.markdown(cards_html, unsafe_allow_html=True)
 
 # ─── 종합 평가 한 줄 ──────────────────────────────────────────
 eval_lines = []
@@ -232,10 +224,10 @@ else:
                     st.warning("⚠️ 현재 페이스로는 1년 이상 소요됩니다. 감량 강도를 조정해 보세요.")
 
     fig_weight.update_layout(
-        **PLOT_CFG, height=320,
+        **PLOT_CFG, height=280,
         xaxis_title=None, yaxis_title="kg",
         margin=dict(l=40, r=15, t=30, b=30),
-        xaxis=dict(tickangle=-45, tickfont=dict(size=10)),
+        xaxis=dict(tickangle=-45, tickfont=dict(size=10), nticks=8),
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, font=dict(size=11)),
     )
     st.plotly_chart(fig_weight, use_container_width=True)
