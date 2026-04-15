@@ -126,14 +126,14 @@ else:
 metric_data.append(("연속 기록", f"{streak}일", streak_eval, streak_color))
 
 # HTML 그리드 (모바일 2x2 강제)
-cards_html = "<div style='display:grid;grid-template-columns:1fr 1fr;gap:8px;'>"
+cards_html = "<div style='display:grid;grid-template-columns:1fr 1fr;gap:10px;'>"
 for label, value, delta, color in metric_data:
     cards_html += (
-        f"<div style='background:rgba(30,41,59,0.5);border-radius:10px;padding:12px;"
+        f"<div style='background:rgba(30,41,59,0.5);border-radius:12px;padding:14px;"
         f"border:1px solid rgba(148,163,184,0.1);'>"
-        f"<div style='font-size:12px;color:#94A3B8;margin-bottom:4px;'>{label}</div>"
-        f"<div style='font-size:20px;font-weight:700;color:#F8FAFC;'>{value}</div>"
-        f"<div style='font-size:12px;color:{color};margin-top:2px;'>{delta}</div>"
+        f"<div style='font-size:13px;color:#94A3B8;margin-bottom:6px;'>{label}</div>"
+        f"<div style='font-size:24px;font-weight:700;color:#F8FAFC;line-height:1.2;'>{value}</div>"
+        f"<div style='font-size:14px;color:{color};margin-top:4px;font-weight:500;'>{delta}</div>"
         f"</div>"
     )
 cards_html += "</div>"
@@ -252,11 +252,11 @@ else:
         annotation_text=f"목표 {target:,}", annotation_position="right",
     )
     fig_line.update_layout(
-        **PLOT_CFG, height=280,
+        **PLOT_CFG, height=220,
         xaxis_title=None, yaxis_title="kcal",
         margin=dict(l=50, r=15, t=20, b=40), showlegend=False,
         xaxis=dict(tickangle=-45, tickfont=dict(size=10)),
-        bargap=0.3,
+        bargap=0.5,
     )
     st.plotly_chart(fig_line, use_container_width=True)
 
@@ -287,18 +287,25 @@ with pc1:
     if top_foods.empty:
         st.caption("데이터 없음")
     else:
-        fig_bar = go.Figure(go.Bar(
-            x=top_foods["count"], y=top_foods["food_name"],
-            orientation="h", marker_color="#8B5CF6",
-            text=top_foods.apply(lambda r: f"{r['count']}회", axis=1),
-            textposition="outside",
-        ))
-        fig_bar.update_layout(
-            **PLOT_CFG, height=220,
-            xaxis_title="", yaxis=dict(autorange="reversed"),
-            margin=dict(l=80, r=40, t=10, b=30),
-        )
-        st.plotly_chart(fig_bar, use_container_width=True)
+        max_count = int(top_foods["count"].max())
+        rank_html = "<div style='margin-top:8px;'>"
+        for rank, (_, row) in enumerate(top_foods.iterrows(), 1):
+            cnt = int(row["count"])
+            pct = cnt / max_count * 100
+            medal = ["🥇", "🥈", "🥉", "4️⃣", "5️⃣"][rank - 1]
+            rank_html += (
+                f"<div style='margin-bottom:10px;'>"
+                f"<div style='display:flex;align-items:center;gap:6px;font-size:14px;'>"
+                f"<span>{medal}</span>"
+                f"<span style='font-weight:600;color:#F8FAFC;'>{row['food_name']}</span>"
+                f"<span style='margin-left:auto;font-size:13px;color:#94A3B8;'>{cnt}회</span>"
+                f"</div>"
+                f"<div style='background:rgba(30,41,59,0.6);border-radius:4px;height:6px;margin-top:4px;'>"
+                f"<div style='width:{pct}%;height:100%;background:#8B5CF6;border-radius:4px;'></div>"
+                f"</div></div>"
+            )
+        rank_html += "</div>"
+        st.markdown(rank_html, unsafe_allow_html=True)
 
 # ─── 요일별 평균 섭취 ──────────────────────────────────────
 with pc2:
@@ -327,9 +334,10 @@ with pc2:
             annotation_text=f"목표", annotation_position="right",
         )
         fig_wd.update_layout(
-            **PLOT_CFG, height=220,
+            **PLOT_CFG, height=240,
             xaxis_title="", yaxis_title="평균 kcal",
             margin=dict(l=40, r=20, t=30, b=30),
+            bargap=0.4,
         )
         st.plotly_chart(fig_wd, use_container_width=True)
 
@@ -350,18 +358,20 @@ if not totals.empty:
             values=[t_c, t_p, t_f],
             marker=dict(colors=["#4ADE80", "#60A5FA", "#FBBF24"]),
             textinfo="label+percent",
-            textfont=dict(size=12),
-            hole=0.55,
+            textfont=dict(size=15, color="#F8FAFC"),
+            hole=0.6,
         ))
         fig_pie.update_layout(
-            **PLOT_CFG, height=220, showlegend=False,
-            margin=dict(l=0, r=0, t=0, b=0),
+            **PLOT_CFG, height=260, showlegend=False,
+            margin=dict(l=10, r=10, t=10, b=10),
             annotations=[dict(
-                text=f"<b>일평균</b><br>{avg_kcal_str} kcal",
-                x=0.5, y=0.5, font=dict(size=14), showarrow=False,
+                text=f"<span style='font-size:12px;color:#94A3B8;'>일평균</span><br>"
+                     f"<b style='font-size:22px;'>{avg_kcal_str}</b><br>"
+                     f"<span style='font-size:11px;color:#94A3B8;'>kcal</span>",
+                x=0.5, y=0.5, showarrow=False,
             )],
         )
-        # 도넛을 중앙에 배치 (모바일/PC 모두 적절한 크기)
+        # 도넛을 중앙에 배치
         pc_left, pc_center, pc_right = st.columns([1, 2, 1])
         with pc_center:
             st.plotly_chart(fig_pie, use_container_width=True)
