@@ -146,9 +146,9 @@ st.markdown(
     f"<div style='font-size:10px;color:#64748B;'>일일 소모</div></div>"
     f"<div style='background:rgba(30,41,59,0.5);border:1px solid rgba(148,163,184,0.15);"
     f"border-radius:10px;padding:12px;text-align:center;'>"
-    f"<div style='font-size:11px;color:#94A3B8;'>감량</div>"
+    f"<div style='font-size:11px;color:#94A3B8;'>일일 적자</div>"
     f"<div style='font-size:18px;font-weight:700;margin-top:2px;color:#F59E0B;'>-{deficit_level}</div>"
-    f"<div style='font-size:10px;color:#64748B;'>kcal/일</div></div>"
+    f"<div style='font-size:10px;color:#64748B;'>kcal</div></div>"
     f"</div>",
     unsafe_allow_html=True,
 )
@@ -219,7 +219,7 @@ if target_weight and target_weight != weight:
         f"</div>"
         f"<div style='background:rgba(15,23,42,0.6);border-radius:8px;height:12px;overflow:hidden;position:relative;'>"
         f"<div style='background:linear-gradient(90deg,{bar_color},{bar_color}cc);"
-        f"height:100%;width:{progress_pct:.1f}%;border-radius:8px;'></div></div>"
+        f"height:100%;width:{max(progress_pct, 3):.1f}%;border-radius:8px;min-width:8px;'></div></div>"
         f"<div style='display:flex;justify-content:space-between;font-size:11px;color:#94A3B8;margin-top:6px;'>"
         f"<span>{progress_label}</span><span style='color:{bar_color};font-weight:600;'>{progress_pct:.0f}%</span>"
         f"</div>"
@@ -255,10 +255,14 @@ if deficit_level > 0 and target_weight < weight:
     )
 
     if predicted_date <= datetime.date.fromisoformat(target_date.isoformat()):
-        st.success(f"✅ 목표 날짜({target_date}) 이내에 달성 가능합니다!")
+        st.success(f"✅ 현 강도 유지 시 목표 날짜({target_date}) 이내 달성 가능!")
     else:
         diff_days = (predicted_date - datetime.date.fromisoformat(target_date.isoformat())).days
-        st.info(f"💡 목표 날짜보다 약 {diff_days}일 늦을 수 있습니다. 감량 강도를 올리거나 목표를 조정해 보세요.")
+        st.info(
+            f"💡 현 강도 유지 시 목표보다 약 {diff_days}일 늦을 수 있습니다.\n\n"
+            f"감량 강도를 올리거나 목표 날짜·체중을 조정해 보세요. "
+            f"(꾸준히만 해도 충분합니다 — 무리한 속도는 요요 위험)"
+        )
 
 st.caption(
     f"Mifflin-St Jeor · {gender} · {age}세 · {height}cm · {weight}kg "
