@@ -27,7 +27,7 @@ from services.sheets_service import (
     save_exercise, get_daily_burned, get_exercise_log,
     delete_exercise_row, update_exercise_row,
     save_water, get_water_log, reset_water,
-    get_favorites, get_recent_foods, get_yesterday_meals,
+    get_favorites, get_recent_foods, get_yesterday_meals, get_streak,
 )
 
 email = require_auth()
@@ -252,6 +252,26 @@ if not w_totals.empty:
         f"평균 {w_avg:,.0f}kcal · 목표 초과 {over_days}일"
     )
 
+# 연속 기록 배지
+streak = get_streak(email)
+if streak >= 3:
+    if streak >= 30:
+        badge, msg = "🏆", f"{streak}일 연속! 대단해요!"
+    elif streak >= 14:
+        badge, msg = "🌟", f"{streak}일 연속 기록 중!"
+    elif streak >= 7:
+        badge, msg = "🔥", f"{streak}일 연속 기록 중!"
+    else:
+        badge, msg = "✨", f"{streak}일 연속 기록 중!"
+    st.markdown(
+        f"<div style='background:linear-gradient(90deg,rgba(251,191,36,0.2),rgba(251,191,36,0.05));"
+        f"border-left:4px solid #FBBF24;padding:8px 12px;border-radius:6px;margin:4px 0;'>"
+        f"<span style='font-size:16px;'>{badge}</span> "
+        f"<span style='font-weight:600;color:#FBBF24;'>{msg}</span>"
+        f"</div>",
+        unsafe_allow_html=True,
+    )
+
 # ═══════════════════════════════════════════════════════════════
 # 식사유형 자동 추천 (시간대 기반)
 # ═══════════════════════════════════════════════════════════════
@@ -373,7 +393,7 @@ with tab_meal:
             st.image(uploaded, width=180)
             ext = uploaded.name.rsplit(".", 1)[-1].lower()
             media_map = {"jpg": "image/jpeg", "jpeg": "image/jpeg", "png": "image/png"}
-            with st.spinner(f"{uploaded.name} 분석 중..."):
+            with st.spinner(f"🔍 {uploaded.name} AI 분석 중... (5~15초 소요)"):
                 try:
                     result = analyze_food_image(uploaded.getvalue(), media_map.get(ext, "image/jpeg"))
                     if result and not result.get("error") and result.get("foods"):
@@ -386,7 +406,7 @@ with tab_meal:
 
         food_lines = [l.strip() for l in manual_text.strip().split("\n") if l.strip()] if manual_text.strip() else []
         if food_lines:
-            with st.spinner(f"{len(food_lines)}개 음식 추정 중..."):
+            with st.spinner(f"🔍 {len(food_lines)}개 음식 AI 추정 중..."):
                 try:
                     estimated = estimate_multiple_foods(food_lines)
                     for f in estimated:
@@ -415,6 +435,14 @@ with tab_meal:
             save_meals(email, date_str, meal_type, pending)
             total = sum(f.get("calories", 0) * f.get("quantity", 1) for f in pending)
             st.toast(f"✅ {meal_type} {len(pending)}개 ({total:,.0f}kcal) 저장!", icon="🍽️")
+
+            # 목표 달성 축하 토스트
+            new_eaten = eaten_cal + total
+            new_protein = t_protein + sum(f.get("protein", 0) * f.get("quantity", 1) for f in pending)
+            if eaten_cal < daily_budget <= new_eaten:
+                st.toast("🎉 오늘 칼로리 목표 달성!", icon="🎯")
+            if t_protein < target_protein <= new_protein:
+                st.toast(f"🥩 단백질 목표 달성! ({new_protein:.0f}g)", icon="💪")
 
         if not has_error:
             st.session_state.form_version += 1

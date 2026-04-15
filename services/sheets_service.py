@@ -333,6 +333,26 @@ def get_daily_totals(email: str, start_date: str, end_date: str) -> pd.DataFrame
     return agg.sort_values("date")
 
 
+def get_streak(email: str) -> int:
+    """오늘 또는 어제부터 거슬러 올라가며 연속으로 기록한 일수."""
+    end = datetime.now(KST).date()
+    start = end - timedelta(days=60)  # 최대 60일
+    df = get_meals(email, start.isoformat(), end.isoformat())
+    if df.empty:
+        return 0
+    recorded_dates = set(df["date"].unique())
+    # 오늘부터 거슬러 올라가며 연속 기록 체크
+    streak = 0
+    current = end
+    # 오늘 기록 없으면 어제부터 체크
+    if current.isoformat() not in recorded_dates:
+        current -= timedelta(days=1)
+    while current.isoformat() in recorded_dates:
+        streak += 1
+        current -= timedelta(days=1)
+    return streak
+
+
 def get_recent_foods(email: str, days: int = 3, limit: int = 10) -> pd.DataFrame:
     """최근 N일 먹은 음식 (중복 제거, 최신순)."""
     end = datetime.now().strftime("%Y-%m-%d")
