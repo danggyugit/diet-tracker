@@ -33,6 +33,9 @@ PAGES = {
         st.Page("pages/profile.py", title="프로필", icon=":material/person:"),
         st.Page("pages/favorites.py", title="즐겨찾기", icon=":material/star:"),
     ],
+    "도움말": [
+        st.Page("pages/manual.py", title="사용 메뉴얼", icon=":material/menu_book:"),
+    ],
 }
 
 pg = st.navigation(PAGES, position="sidebar")
