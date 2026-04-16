@@ -80,18 +80,16 @@ except (ValueError, TypeError):
     deficit_level = 700
 base_budget = round(tdee - deficit_level)
 
-# 운동 칼로리 보정 — 최근 7일 평균
-exercise_compensation = (profile.get("exercise_compensation") or "off") == "on"
-_end_d = today_kst()
-_start_d = _end_d - datetime.timedelta(days=7)
-_ex7 = get_exercise_log(email, _start_d.isoformat(), _end_d.isoformat())
-avg_burn_7d = int(_ex7["calories_burned"].sum() / 7) if not _ex7.empty else 0
-exercise_boost = avg_burn_7d if exercise_compensation else 0
-daily_budget = base_budget + exercise_boost
+# 운동 칼로리 보정 — off / avg7 / daily (그날 운동 burn 기반)
+_comp_raw = (profile.get("exercise_compensation") or "off").lower()
+if _comp_raw == "on":  # 하위 호환
+    _comp_raw = "avg7"
+if _comp_raw not in ("off", "avg7", "daily"):
+    _comp_raw = "off"
+exercise_comp_mode = _comp_raw
 
 target_protein, protein_mult = calc_protein_g(latest_weight, deficit_level)
-target_fat, _fat_source = calc_fat_g(daily_budget, latest_weight)
-target_carbs = calc_carbs_g(daily_budget, target_protein, target_fat)
+# daily_budget·target_fat·target_carbs는 date_str 결정 후 재계산
 
 # ═══════════════════════════════════════════════════════════════
 # 상단: 날짜 + 체중
@@ -124,6 +122,20 @@ selected_date = st.date_input(
 if selected_date != st.session_state.rec_date:
     st.session_state.rec_date = selected_date
 date_str = st.session_state.rec_date.isoformat()
+
+# date_str 결정 후 운동 보정 + 영양소 목표 계산
+if exercise_comp_mode == "avg7":
+    _end_d = today_kst()
+    _start_d = _end_d - datetime.timedelta(days=7)
+    _ex7 = get_exercise_log(email, _start_d.isoformat(), _end_d.isoformat())
+    exercise_boost = int(_ex7["calories_burned"].sum() / 7) if not _ex7.empty else 0
+elif exercise_comp_mode == "daily":
+    exercise_boost = int(get_daily_burned(email, date_str))
+else:
+    exercise_boost = 0
+daily_budget = base_budget + exercise_boost
+target_fat, _fat_source = calc_fat_g(daily_budget, latest_weight)
+target_carbs = calc_carbs_g(daily_budget, target_protein, target_fat)
 
 st.markdown(
     "<div style='display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin:4px 0 8px;'>"

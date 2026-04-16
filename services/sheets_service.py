@@ -294,6 +294,22 @@ def get_latest_weight(_email: str) -> float | None:
         return None
 
 
+@st.cache_data(ttl=300)
+def get_earliest_weight(_email: str) -> float | None:
+    """가장 오래된 체중 기록 (시작 체중 표시용)."""
+    ws = _get_worksheet(WS_WEIGHT_LOG)
+    _ensure_headers(ws, WEIGHT_LOG_HEADERS)
+    records = ws.get_all_records()
+    user_records = [r for r in records if r.get("email") == _email and r.get("date")]
+    if not user_records:
+        return None
+    earliest = min(user_records, key=lambda r: r.get("date", ""))
+    try:
+        return float(earliest["weight"])
+    except (ValueError, KeyError):
+        return None
+
+
 def save_weight(email: str, date: str, weight: float) -> None:
     ws = _get_worksheet(WS_WEIGHT_LOG)
     _ensure_headers(ws, WEIGHT_LOG_HEADERS)
@@ -314,6 +330,7 @@ def save_weight(email: str, date: str, weight: float) -> None:
 
     get_weight_log.clear()
     get_latest_weight.clear()
+    get_earliest_weight.clear()
 
 
 # ─── Aggregations ────────────────────────────────────────────

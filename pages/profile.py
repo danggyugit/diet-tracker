@@ -7,8 +7,8 @@ import streamlit as st
 from config import ACTIVITY_MULTIPLIERS, today_kst
 from services.auth_service import require_auth
 from services.sheets_service import (
-    get_profile, save_profile, get_latest_weight,
-    get_meals, get_weight_log, get_exercise_log,
+    get_profile, save_profile, get_latest_weight, get_earliest_weight,
+    get_meals, get_weight_log, get_exercise_log, get_daily_burned,
 )
 from services.calorie_service import (
     calc_bmr, calc_tdee, calc_protein_g, calc_fat_g, calc_carbs_g,
@@ -94,16 +94,31 @@ with st.form("profile_form"):
 
     st.markdown("---")
     st.markdown("**🏃 운동 칼로리 보정**")
-    saved_comp = profile.get("exercise_compensation") or "off"
-    exercise_compensation = st.toggle(
-        "운동한 만큼 식단 칼로리 추가 허용",
-        value=(saved_comp == "on"),
+    saved_comp_raw = (profile.get("exercise_compensation") or "off").lower()
+    # 하위 호환: 기존 "on" 값은 "avg7"로 매핑
+    if saved_comp_raw == "on":
+        saved_comp_raw = "avg7"
+    if saved_comp_raw not in ("off", "avg7", "daily"):
+        saved_comp_raw = "off"
+
+    COMP_OPTIONS = {
+        "off":   "끄기 — 식단 목표 고정 (운동은 추가 적자로만 작동)",
+        "avg7":  "최근 7일 평균 — 매일 동일한 목표 (안정적)",
+        "daily": "그날 운동 기준 — 운동량 따라 매일 변동 (정확)",
+    }
+    comp_keys = list(COMP_OPTIONS.keys())
+    comp_choice = st.selectbox(
+        "보정 방식",
+        comp_keys,
+        index=comp_keys.index(saved_comp_raw),
+        format_func=lambda k: COMP_OPTIONS[k],
         help=(
-            "켜기: 최근 7일 평균 운동 소모량을 일일 목표에 더해서 식단 권장량을 늘림. "
-            "운동 많이 한 날 더 먹어도 OK. (정석 방식)\n"
-            "끄기: 운동은 추가 적자로만 작동. 식단 권장량은 고정."
+            "운동한 만큼 식단 권장량을 늘리는 방식 선택. "
+            "정석은 '7일 평균' 또는 '그날 기준'. "
+            "MET 공식이 약 20-30% 과대평가하므로 표시값보다 약간 적게 드세요."
         ),
     )
+    exercise_compensation = comp_choice
 
     st.markdown("---")
     st.markdown("**목표 (참고)** — 감량 속도 예측용")
@@ -126,7 +141,7 @@ bmr = calc_bmr(weight, height, age, gender)
 tdee = calc_tdee(bmr, activity_level)
 base_daily_target = round(tdee - deficit_level)
 
-# 운동 칼로리 보정 — 최근 7일 평균 운동 burn을 일일 목표에 추가
+# 운동 칼로리 보정 — off / avg7 / daily 중 선택
 end_d = today_kst()
 start_d = end_d - datetime.timedelta(days=7)
 ex_recent = get_exercise_log(email, start_d.isoformat(), end_d.isoformat())
@@ -134,7 +149,17 @@ avg_burn_7d = (
     int(ex_recent["calories_burned"].sum() / 7)
     if not ex_recent.empty else 0
 )
-exercise_boost = avg_burn_7d if exercise_compensation else 0
+today_burn = int(get_daily_burned(email, end_d.isoformat()))
+
+if exercise_compensation == "avg7":
+    exercise_boost = avg_burn_7d
+    boost_label = f"최근 7일 평균 +{avg_burn_7d:,} kcal"
+elif exercise_compensation == "daily":
+    exercise_boost = today_burn
+    boost_label = f"오늘 운동 +{today_burn:,} kcal (참고: 7일 평균 {avg_burn_7d:,})"
+else:
+    exercise_boost = 0
+    boost_label = ""
 daily_target = base_daily_target + exercise_boost
 
 # 단백질 — 감량 강도 기반 (정석)
@@ -149,7 +174,7 @@ st.divider()
 # ─── 히어로 카드: 일일 섭취 목표 ──────────────────────────────
 boost_html = (
     f"<div style='font-size:11px;color:#FBBF24;margin-top:6px;'>"
-    f"기본 {base_daily_target:,} + 운동 보정 +{exercise_boost:,} (최근 7일 평균)</div>"
+    f"기본 {base_daily_target:,} + {boost_label}</div>"
     if exercise_boost > 0 else ""
 )
 st.markdown(
@@ -215,7 +240,10 @@ st.caption(
 
 # ─── 체중 진행률 바 ──────────────────────────────────────────
 if target_weight and target_weight != weight:
-    starting_weight = float(profile.get("weight", weight))
+    # 시작 체중: 가장 오래된 체중 기록 → 없으면 프로필 weight 사용
+    starting_weight = get_earliest_weight(email)
+    if starting_weight is None:
+        starting_weight = float(profile.get("weight", weight))
     if starting_weight == target_weight:
         starting_weight = weight + abs(weight - target_weight)
 
@@ -308,7 +336,7 @@ if submitted:
         "activity_level": activity_level, "target_calories": 0,
         "target_weight": target_weight, "target_date": target_date.isoformat(),
         "deficit_level": deficit_level,
-        "exercise_compensation": "on" if exercise_compensation else "off",
+        "exercise_compensation": exercise_compensation,
     })
     st.success("프로필이 저장되었습니다!")
     st.rerun()
