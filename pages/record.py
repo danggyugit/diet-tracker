@@ -99,7 +99,15 @@ if selected_date != st.session_state.rec_date:
     st.session_state.rec_date = selected_date
 date_str = st.session_state.rec_date.isoformat()
 
-# 날짜 빠른 이동 (st.pills — 모바일 가로 유지)
+# 날짜 빠른 이동 (st.pills — 모바일 가로 유지 + 꽉 차게)
+st.markdown("""<style>
+[data-testid="stPills"] [role="tablist"] {
+    width: 100% !important; display: flex !important; gap: 6px !important;
+}
+[data-testid="stPills"] [role="tab"] {
+    flex: 1 !important; justify-content: center !important;
+}
+</style>""", unsafe_allow_html=True)
 _nav = st.pills(
     "날짜 이동", ["◀ 어제", "오늘", "내일 ▶"],
     default=None, label_visibility="collapsed",
