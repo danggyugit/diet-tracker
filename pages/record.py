@@ -89,32 +89,52 @@ target_carbs = max(round((daily_budget - target_protein * 4 - target_fat * 9) / 
 if "selected_date_state" not in st.session_state:
     st.session_state.selected_date_state = today_kst()
 
-hc1, hc2 = st.columns([1, 1])
-with hc1:
-    selected_date = st.date_input("날짜", value=st.session_state.selected_date_state, key="date_picker")
-    st.session_state.selected_date_state = selected_date
-    # 날짜 빠른 이동 버튼
-    dc1, dc2, dc3 = st.columns(3)
-    if dc1.button("◀ 어제", use_container_width=True, key="btn_yesterday"):
-        st.session_state.selected_date_state = selected_date - datetime.timedelta(days=1)
-        st.rerun()
-    if dc2.button("오늘", use_container_width=True, key="btn_today"):
+# 날짜 빠른 이동 (query_params 기반, 모바일 가로 강제)
+qp = st.query_params
+if "date_nav" in qp:
+    nav = qp["date_nav"]
+    cur = st.session_state.selected_date_state
+    if nav == "prev":
+        st.session_state.selected_date_state = cur - datetime.timedelta(days=1)
+    elif nav == "today":
         st.session_state.selected_date_state = today_kst()
-        st.rerun()
-    if dc3.button("내일 ▶", use_container_width=True, key="btn_tomorrow"):
-        st.session_state.selected_date_state = selected_date + datetime.timedelta(days=1)
-        st.rerun()
-    date_str = selected_date.isoformat()
-with hc2:
-    today_weight = st.number_input(
-        "⚖️ 오늘 체중 (kg)", min_value=30.0, max_value=200.0,
-        value=latest_weight, step=0.1, format="%.1f",
-        key=f"weight_top_{date_str}",
-    )
-    if st.button("체중 저장", use_container_width=True, key="btn_save_weight"):
-        save_weight(email, date_str, today_weight)
-        st.toast(f"✅ 체중 {today_weight}kg 저장!", icon="⚖️")
-        st.rerun()
+    elif nav == "next":
+        st.session_state.selected_date_state = cur + datetime.timedelta(days=1)
+    del st.query_params["date_nav"]
+    st.rerun()
+
+selected_date = st.date_input("날짜", value=st.session_state.selected_date_state, key="date_picker")
+st.session_state.selected_date_state = selected_date
+date_str = selected_date.isoformat()
+
+st.markdown(
+    "<div style='display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin:4px 0 8px;'>"
+    "<a href='?date_nav=prev' target='_self' style='background:rgba(30,41,59,0.5);"
+    "border:1px solid rgba(148,163,184,0.2);color:#F8FAFC;padding:8px 0;"
+    "border-radius:8px;text-align:center;text-decoration:none;font-size:13px;'>◀ 어제</a>"
+    "<a href='?date_nav=today' target='_self' style='background:rgba(30,41,59,0.5);"
+    "border:1px solid rgba(148,163,184,0.2);color:#F8FAFC;padding:8px 0;"
+    "border-radius:8px;text-align:center;text-decoration:none;font-size:13px;'>오늘</a>"
+    "<a href='?date_nav=next' target='_self' style='background:rgba(30,41,59,0.5);"
+    "border:1px solid rgba(148,163,184,0.2);color:#F8FAFC;padding:8px 0;"
+    "border-radius:8px;text-align:center;text-decoration:none;font-size:13px;'>내일 ▶</a>"
+    "</div>",
+    unsafe_allow_html=True,
+)
+
+with st.expander("⚖️ 체중 기록", expanded=False):
+    wc1, wc2 = st.columns([3, 1])
+    with wc1:
+        today_weight = st.number_input(
+            "체중 (kg)", min_value=30.0, max_value=200.0,
+            value=latest_weight, step=0.1, format="%.1f",
+            key=f"weight_top_{date_str}", label_visibility="collapsed",
+        )
+    with wc2:
+        if st.button("저장", use_container_width=True, key="btn_save_weight"):
+            save_weight(email, date_str, today_weight)
+            st.toast(f"✅ 체중 {today_weight}kg 저장!", icon="⚖️")
+            st.rerun()
 
 # ═══════════════════════════════════════════════════════════════
 # 게이지 + 비교
@@ -137,47 +157,42 @@ w_totals = get_daily_totals(email, week_start, date_str)
 w_avg = float(w_totals["total_cal"].mean()) if not w_totals.empty else 0
 
 if remaining_cal > daily_budget * 0.3:
-    bar_color, status = "#4ADE80", f"남은 {remaining_cal:,.0f} kcal"
+    bar_color = "#22C55E"
+    hero_text = f"남은 <b style='font-size:28px;'>{remaining_cal:,.0f}</b> kcal"
 elif remaining_cal > 0:
-    bar_color, status = "#FDE047", f"남은 {remaining_cal:,.0f} kcal"
+    bar_color = "#FBBF24"
+    hero_text = f"남은 <b style='font-size:28px;'>{remaining_cal:,.0f}</b> kcal"
 else:
-    bar_color, status = "#FB7185", f"{abs(remaining_cal):,.0f} kcal 초과"
+    bar_color = "#EF4444"
+    hero_text = f"<b style='font-size:28px;'>{abs(remaining_cal):,.0f}</b> kcal 초과"
 
-gauge_max = max(daily_budget * 1.3, net_cal * 1.1, 100)
-fig_budget = go.Figure(go.Indicator(
-    mode="gauge+number", value=net_cal,
-    gauge=dict(
-        axis=dict(range=[0, gauge_max], tickfont=dict(size=10)),
-        bar=dict(color=bar_color, thickness=0.3),
-        steps=[
-            dict(range=[0, daily_budget * 0.3], color="rgba(74,222,128,0.6)"),
-            dict(range=[daily_budget * 0.3, daily_budget * 0.6], color="rgba(74,222,128,0.4)"),
-            dict(range=[daily_budget * 0.6, daily_budget * 0.85], color="rgba(253,224,71,0.45)"),
-            dict(range=[daily_budget * 0.85, daily_budget], color="rgba(251,176,59,0.5)"),
-            dict(range=[daily_budget, daily_budget * 1.1], color="rgba(252,129,129,0.5)"),
-            dict(range=[daily_budget * 1.1, gauge_max], color="rgba(252,129,129,0.7)"),
-        ],
-        threshold=dict(line=dict(color="#F8FAFC", width=2), value=daily_budget),
-    ),
-    title=dict(text="순 칼로리 (섭취 - 운동)", font=dict(size=14)),
-    number=dict(suffix=f" / {daily_budget:,} kcal", font=dict(size=18), valueformat=","),
-))
-fig_budget.update_layout(**PLOT_CFG, height=180, margin=dict(l=15, r=15, t=45, b=0))
-st.plotly_chart(fig_budget, use_container_width=True)
+pct_fill = min(net_cal / daily_budget * 100, 100) if daily_budget > 0 else 0
 
-# 비교 캡션
-comp_parts = [status]
+comp_parts = []
 if burned_cal > 0:
-    comp_parts.append(f"섭취 {eaten_cal:,.0f} - 운동 {burned_cal:,.0f}")
+    comp_parts.append(f"섭취 {eaten_cal:,.0f} − 운동 {burned_cal:,.0f}")
 if y_cal > 0:
     diff = eaten_cal - y_cal
-    arrow = "↑" if diff > 0 else "↓"
-    comp_parts.append(f"어제 대비 {arrow} {abs(diff):,.0f}")
+    arrow, clr = ("↑", "#FB7185") if diff > 0 else ("↓", "#4ADE80")
+    comp_parts.append(f"어제 <span style='color:{clr};'>{arrow}{abs(diff):,.0f}</span>")
 if w_avg > 0:
     diff = eaten_cal - w_avg
-    arrow = "↑" if diff > 0 else "↓"
-    comp_parts.append(f"주평균 대비 {arrow} {abs(diff):,.0f}")
-st.caption(" | ".join(comp_parts))
+    arrow, clr = ("↑", "#FB7185") if diff > 0 else ("↓", "#4ADE80")
+    comp_parts.append(f"주평균 <span style='color:{clr};'>{arrow}{abs(diff):,.0f}</span>")
+comp_html = " · ".join(comp_parts)
+
+st.markdown(
+    f"<div style='background:rgba(30,41,59,0.5);border:1px solid rgba(148,163,184,0.15);"
+    f"border-radius:12px;padding:14px;margin:4px 0;'>"
+    f"<div style='text-align:center;color:{bar_color};margin-bottom:8px;'>{hero_text}</div>"
+    f"<div style='background:rgba(15,23,42,0.6);border-radius:6px;height:14px;overflow:hidden;'>"
+    f"<div style='width:{pct_fill:.1f}%;height:100%;background:{bar_color};border-radius:6px;'></div></div>"
+    f"<div style='display:flex;justify-content:space-between;font-size:11px;color:#94A3B8;margin-top:6px;'>"
+    f"<span>순 {net_cal:,.0f} kcal</span><span>목표 {daily_budget:,} kcal</span></div>"
+    f"{'<div style=\"text-align:center;font-size:11px;color:#94A3B8;margin-top:4px;\">' + comp_html + '</div>' if comp_html else ''}"
+    f"</div>",
+    unsafe_allow_html=True,
+)
 
 if daily_budget < 1200:
     st.caption(f"⚠️ 일일 목표({daily_budget:,})가 안전 권장량(1,200) 미만")
@@ -190,70 +205,68 @@ t_carbs = float(today_totals["total_carbs"].sum()) if not today_totals.empty and
 t_protein = float(today_totals["total_protein"].sum()) if not today_totals.empty and "total_protein" in today_totals.columns else 0
 t_fat = float(today_totals["total_fat"].sum()) if not today_totals.empty and "total_fat" in today_totals.columns else 0
 
+def _bar_html(icon, name, cur, goal, color):
+    pct = min(cur / goal * 100, 100) if goal > 0 else 0
+    over = max(cur - goal, 0)
+    over_pct = min(over / goal * 100, 50) if goal > 0 else 0
+    over_html = ""
+    if over > 0:
+        over_html = f"<div style='position:absolute;left:{min(pct, 100)}%;width:{over_pct}%;height:100%;background:#FB7185;'></div>"
+    status = f"{cur:.0f}/{goal}g" if over == 0 else f"{cur:.0f}/{goal}g (+{over:.0f})"
+    return (
+        f"<div style='margin:6px 0;'>"
+        f"<div style='display:flex;gap:6px;font-size:13px;margin-bottom:3px;'>"
+        f"<span>{icon} {name}</span>"
+        f"<span style='margin-left:auto;color:#94A3B8;'>{status}</span>"
+        f"</div>"
+        f"<div style='background:rgba(30,41,59,0.8);border-radius:6px;height:14px;position:relative;overflow:hidden;'>"
+        f"<div style='width:{pct}%;height:100%;background:{color};'></div>"
+        f"{over_html}"
+        f"</div></div>"
+    )
+
 if t_carbs + t_protein + t_fat > 0:
-    dc1, dc2 = st.columns([1, 1])
-    with dc1:
+    dc_l, dc_c, dc_r = st.columns([1, 2, 1])
+    with dc_c:
         fig = go.Figure(go.Pie(
             labels=["탄수화물", "단백질", "지방"],
             values=[t_carbs, t_protein, t_fat],
             marker=dict(colors=["#4ADE80", "#60A5FA", "#FBBF24"]),
-            textinfo="percent", textfont=dict(size=12),
-            hole=0.55, hovertemplate="%{label}: %{value:.0f}g<extra></extra>",
+            textinfo="percent", textposition="inside",
+            textfont=dict(size=12, color="#0F172A"),
+            hole=0.58, sort=False,
+            hovertemplate="%{label}: %{value:.0f}g<extra></extra>",
         ))
-        fig.update_layout(**PLOT_CFG, height=220, showlegend=False,
-            margin=dict(l=5, r=5, t=10, b=10),
+        fig.update_layout(**PLOT_CFG, height=180, showlegend=False,
+            margin=dict(l=5, r=5, t=5, b=5),
             annotations=[dict(
-                text=f"<b>{eaten_cal:,.0f}</b><br><span style='font-size:11px'>kcal</span>",
-                x=0.5, y=0.5, font=dict(size=18), showarrow=False,
+                text=f"<b>{eaten_cal:,.0f}</b><br><span style='font-size:10px;color:#94A3B8;'>kcal</span>",
+                x=0.5, y=0.5, font=dict(size=16), showarrow=False,
             )],
         )
         st.plotly_chart(fig, use_container_width=True)
-    with dc2:
-        def _bar_html(icon, name, cur, goal, color):
-            pct = min(cur / goal * 100, 100) if goal > 0 else 0
-            over = max(cur - goal, 0)
-            over_pct = min(over / goal * 100, 50) if goal > 0 else 0
-            over_html = ""
-            if over > 0:
-                over_html = f"<div style='position:absolute;left:{pct}%;width:{over_pct}%;height:100%;background:#FB7185;'></div>"
-            status = f"{cur:.0f}/{goal}g" if over == 0 else f"{cur:.0f}/{goal}g (+{over:.0f})"
-            return (
-                f"<div style='margin:10px 0;'>"
-                f"<div style='display:flex;gap:6px;font-size:13px;margin-bottom:4px;'>"
-                f"<span>{icon} {name}</span>"
-                f"<span style='margin-left:auto;color:#94A3B8;'>{status}</span>"
-                f"</div>"
-                f"<div style='background:rgba(30,41,59,0.8);border-radius:6px;height:16px;position:relative;overflow:hidden;'>"
-                f"<div style='width:{pct}%;height:100%;background:{color};'></div>"
-                f"{over_html}"
-                f"</div></div>"
-            )
 
-        st.markdown(
-            _bar_html("🍚", "탄수화물", t_carbs, target_carbs, "#4ADE80")
-            + _bar_html("🥩", "단백질", t_protein, target_protein, "#60A5FA")
-            + _bar_html("🧈", "지방", t_fat, target_fat, "#FBBF24"),
-            unsafe_allow_html=True,
-        )
+    st.markdown(
+        _bar_html("🍚", "탄수화물", t_carbs, target_carbs, "#4ADE80")
+        + _bar_html("🥩", "단백질", t_protein, target_protein, "#60A5FA")
+        + _bar_html("🧈", "지방", t_fat, target_fat, "#FBBF24"),
+        unsafe_allow_html=True,
+    )
 else:
     st.caption("오늘 식사 기록이 없습니다.")
 
-st.caption(
-    f"목표: 탄 {target_carbs}g · 단 {target_protein}g (체중×{protein_mult}) · 지 {target_fat}g (30%)"
-)
-
-# ─── 주간 통계 한 줄 ──────────────────────────────────────────
+# 주간 통계 + 연속 기록 (통합 카드)
+streak = get_streak(email)
+week_stats = ""
 if not w_totals.empty:
     days_recorded = len(w_totals)
-    total_week_cal = w_totals["total_cal"].sum()
     over_days = int((w_totals["total_cal"] > daily_budget).sum())
-    st.caption(
-        f"📊 이번 주: {total_week_cal:,.0f}kcal 섭취 ({days_recorded}일 기록) · "
-        f"평균 {w_avg:,.0f}kcal · 목표 초과 {over_days}일"
+    week_stats = (
+        f"<div style='font-size:12px;color:#94A3B8;'>"
+        f"📊 이번 주 {days_recorded}일 기록 · 평균 {w_avg:,.0f}kcal · 초과 {over_days}일</div>"
     )
 
-# 연속 기록 배지
-streak = get_streak(email)
+streak_html = ""
 if streak >= 3:
     if streak >= 30:
         badge, msg = "🏆", f"{streak}일 연속! 대단해요!"
@@ -263,12 +276,13 @@ if streak >= 3:
         badge, msg = "🔥", f"{streak}일 연속 기록 중!"
     else:
         badge, msg = "✨", f"{streak}일 연속 기록 중!"
+    streak_html = f"<div style='font-size:13px;'>{badge} <span style='color:#FBBF24;font-weight:600;'>{msg}</span></div>"
+
+if week_stats or streak_html:
     st.markdown(
-        f"<div style='background:linear-gradient(90deg,rgba(251,191,36,0.2),rgba(251,191,36,0.05));"
-        f"border-left:4px solid #FBBF24;padding:8px 12px;border-radius:6px;margin:4px 0;'>"
-        f"<span style='font-size:16px;'>{badge}</span> "
-        f"<span style='font-weight:600;color:#FBBF24;'>{msg}</span>"
-        f"</div>",
+        f"<div style='background:rgba(30,41,59,0.3);border:1px solid rgba(148,163,184,0.1);"
+        f"border-radius:10px;padding:10px 12px;margin:6px 0;'>"
+        f"{streak_html}{week_stats}</div>",
         unsafe_allow_html=True,
     )
 
