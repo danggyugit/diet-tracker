@@ -99,29 +99,17 @@ if selected_date != st.session_state.rec_date:
     st.session_state.rec_date = selected_date
 date_str = st.session_state.rec_date.isoformat()
 
-# 날짜 빠른 이동 (st.pills — 모바일 가로 유지 + 꽉 차게)
-st.markdown("""<style>
-[data-testid="stPills"] [role="tablist"] {
-    width: 100% !important; display: flex !important; gap: 6px !important;
-}
-[data-testid="stPills"] [role="tab"] {
-    flex: 1 !important; justify-content: center !important;
-}
-</style>""", unsafe_allow_html=True)
-_nav = st.pills(
-    "날짜 이동", ["◀ 어제", "오늘", "내일 ▶"],
-    default=None, label_visibility="collapsed",
-    key=f"nav_{st.session_state.date_ver}",
-)
-if _nav == "◀ 어제":
+# 날짜 빠른 이동
+_nc1, _nc2, _nc3 = st.columns(3)
+if _nc1.button("◀ 어제", use_container_width=True, key="btn_prev_day"):
     st.session_state.rec_date -= datetime.timedelta(days=1)
     st.session_state.date_ver += 1
     st.rerun()
-elif _nav == "오늘":
+if _nc2.button("오늘", use_container_width=True, key="btn_today_day"):
     st.session_state.rec_date = today_kst()
     st.session_state.date_ver += 1
     st.rerun()
-elif _nav == "내일 ▶":
+if _nc3.button("내일 ▶", use_container_width=True, key="btn_next_day"):
     st.session_state.rec_date += datetime.timedelta(days=1)
     st.session_state.date_ver += 1
     st.rerun()
