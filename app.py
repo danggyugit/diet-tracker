@@ -18,6 +18,9 @@ st.set_page_config(
 st.markdown("""<style>
 .block-container { padding-top:4rem !important; }
 [data-testid="stPills"] { display:flex; justify-content:center; }
+[data-testid="stPills"] > div { width:100% !important; }
+[data-testid="stPills"] [role="tablist"] { width:100% !important; display:flex !important; }
+[data-testid="stPills"] [role="tab"] { flex:1 !important; justify-content:center !important; }
 </style>""", unsafe_allow_html=True)
 
 render_sidebar_account()
