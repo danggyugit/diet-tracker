@@ -60,6 +60,9 @@ if "cal_nav" in qp:
             st.session_state.cal_year += 1
         else:
             st.session_state.cal_month += 1
+    elif nav_action == "current":
+        st.session_state.cal_year = today_kst().year
+        st.session_state.cal_month = today_kst().month
     del st.query_params["cal_nav"]
     st.rerun()
 
@@ -70,8 +73,12 @@ nav_html = (
     f"style='background:rgba(30,41,59,0.5);border:1px solid rgba(148,163,184,0.2);"
     f"color:#F8FAFC;padding:10px 0;border-radius:8px;text-align:center;"
     f"text-decoration:none;font-size:14px;font-weight:500;'>◀ 이전</a>"
-    f"<div style='text-align:center;font-size:20px;font-weight:700;'>"
-    f"{st.session_state.cal_year}년 {st.session_state.cal_month}월</div>"
+    f"<a href='?cal_nav=current' target='_self' "
+    f"style='display:block;text-align:center;font-size:20px;font-weight:700;"
+    f"color:#F8FAFC;text-decoration:none;padding:6px 0;border-radius:8px;"
+    f"background:{'rgba(59,130,246,0.15)' if (st.session_state.cal_year != today_kst().year or st.session_state.cal_month != today_kst().month) else 'transparent'};"
+    f"border:1px solid {'rgba(59,130,246,0.3)' if (st.session_state.cal_year != today_kst().year or st.session_state.cal_month != today_kst().month) else 'transparent'};'>"
+    f"{st.session_state.cal_year}년 {st.session_state.cal_month}월</a>"
     f"<a href='?cal_nav=next' target='_self' "
     f"style='background:rgba(30,41,59,0.5);border:1px solid rgba(148,163,184,0.2);"
     f"color:#F8FAFC;padding:10px 0;border-radius:8px;text-align:center;"
