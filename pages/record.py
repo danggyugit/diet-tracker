@@ -100,13 +100,20 @@ if selected_date != st.session_state.rec_date:
 date_str = st.session_state.rec_date.isoformat()
 
 # 날짜 빠른 이동 (st.button + CSS 가로 강제)
-st.markdown(
-    "<style>[data-testid='stColumns']:has(button) "
-    "{flex-wrap:nowrap!important;} "
-    "[data-testid='stColumns']:has(button) > div "
-    "{flex:1!important;min-width:0!important;}</style>",
-    unsafe_allow_html=True,
-)
+st.markdown("""<style>
+@media (max-width: 640px) {
+    div.date-nav-row [data-testid="stColumns"] {
+        flex-wrap: nowrap !important;
+        flex-direction: row !important;
+        gap: 0.5rem !important;
+    }
+    div.date-nav-row [data-testid="stColumns"] > div {
+        flex: 1 1 0 !important;
+        min-width: 0 !important;
+        width: auto !important;
+    }
+}
+</style><div class="date-nav-row">""", unsafe_allow_html=True)
 _nc1, _nc2, _nc3 = st.columns(3)
 if _nc1.button("◀ 어제", use_container_width=True, key="btn_prev_day"):
     st.session_state.rec_date -= datetime.timedelta(days=1)
@@ -120,6 +127,7 @@ if _nc3.button("내일 ▶", use_container_width=True, key="btn_next_day"):
     st.session_state.rec_date += datetime.timedelta(days=1)
     st.session_state.date_ver += 1
     st.rerun()
+st.markdown("</div>", unsafe_allow_html=True)
 
 with st.expander("⚖️ 체중 기록", expanded=False):
     wc1, wc2 = st.columns([3, 1])
