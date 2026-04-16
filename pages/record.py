@@ -31,6 +31,7 @@ from services.sheets_service import (
 )
 
 email = require_auth()
+st.title("🍽️ 식단 기록")
 
 # ─── 세션 상태 ───────────────────────────────────────────────
 for key, default in [
