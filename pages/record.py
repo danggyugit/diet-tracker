@@ -166,18 +166,11 @@ else:
     bar_color = "#EF4444"
     hero_text = f"<b style='font-size:28px;'>{abs(remaining_cal):,.0f}</b> kcal 초과"
 
-raw_pct = net_cal / daily_budget * 100 if daily_budget > 0 else 0
-is_over = raw_pct > 100
-if is_over:
-    display_max = min(raw_pct, 140)
-    goal_marker_pos = 100 / display_max * 100
-    fill_pct = 100
-    over_pct = (raw_pct - 100) / display_max * 100
-else:
-    display_max = 100
-    goal_marker_pos = 100
-    fill_pct = min(raw_pct, 100)
-    over_pct = 0
+is_over = net_cal > daily_budget
+_cal_max = max(net_cal, daily_budget, 1) * 1.08
+cal_goal_pos = daily_budget / _cal_max * 100
+cal_fill_pos = min(net_cal, daily_budget) / _cal_max * 100
+cal_over_pos = max(net_cal - daily_budget, 0) / _cal_max * 100
 
 comp_parts = []
 if burned_cal > 0:
@@ -198,9 +191,9 @@ st.markdown(
     f"border-radius:12px;padding:14px;margin:4px 0;'>"
     f"<div style='text-align:center;color:{bar_color};margin-bottom:8px;'>{hero_text}</div>"
     f"<div style='background:rgba(15,23,42,0.6);border-radius:6px;height:14px;position:relative;overflow:hidden;'>"
-    f"<div style='width:{goal_marker_pos:.1f}%;height:100%;background:{bar_color};border-radius:6px 0 0 6px;'></div>"
-    f"{'<div style=\"position:absolute;left:' + f'{goal_marker_pos:.1f}' + '%;width:' + f'{over_pct:.1f}' + '%;height:100%;background:#EF4444;\"></div>' if is_over else ''}"
-    f"<div style='position:absolute;left:{goal_marker_pos:.1f}%;top:0;width:2px;height:100%;background:#F8FAFC;z-index:1;'></div>"
+    f"<div style='width:{cal_fill_pos:.1f}%;height:100%;background:{bar_color};border-radius:6px 0 0 6px;'></div>"
+    f"{'<div style=\"position:absolute;left:' + f'{cal_goal_pos:.1f}' + '%;width:' + f'{cal_over_pos:.1f}' + '%;height:100%;background:#EF4444;\"></div>' if is_over else ''}"
+    f"<div style='position:absolute;left:{cal_goal_pos:.1f}%;top:0;width:2px;height:100%;background:#F8FAFC;z-index:1;'></div>"
     f"</div>"
     f"<div style='display:flex;justify-content:space-between;font-size:11px;color:#94A3B8;margin-top:6px;'>"
     f"<span>순 {net_cal:,.0f} kcal</span>"
@@ -222,20 +215,13 @@ t_protein = float(today_totals["total_protein"].sum()) if not today_totals.empty
 t_fat = float(today_totals["total_fat"].sum()) if not today_totals.empty and "total_fat" in today_totals.columns else 0
 
 def _bar_html(icon, name, cur, goal, color):
-    raw = cur / goal * 100 if goal > 0 else 0
-    is_over = raw > 100
-    if is_over:
-        disp_max = min(raw, 150)
-        marker_pos = 100 / disp_max * 100
-        fill_w = marker_pos
-        over_w = (raw - 100) / disp_max * 100
-    else:
-        marker_pos = 100
-        fill_w = min(raw, 100)
-        over_w = 0
+    bmax = max(cur, goal, 1) * 1.08
+    gpos = goal / bmax * 100
+    fpos = min(cur, goal) / bmax * 100
+    opos = max(cur - goal, 0) / bmax * 100
     over_val = max(cur - goal, 0)
-    status_clr = "#FB7185" if is_over else "#94A3B8"
-    status = f"{cur:.0f}/{goal}g" if not is_over else f"{cur:.0f}/{goal}g <span style='color:#FB7185;'>(+{over_val:.0f})</span>"
+    ov = cur > goal
+    status = f"{cur:.0f}/{goal}g" if not ov else f"{cur:.0f}/{goal}g <span style='color:#FB7185;'>(+{over_val:.0f})</span>"
     return (
         f"<div style='margin:6px 0;'>"
         f"<div style='display:flex;gap:6px;font-size:13px;margin-bottom:3px;'>"
@@ -243,9 +229,9 @@ def _bar_html(icon, name, cur, goal, color):
         f"<span style='margin-left:auto;color:#94A3B8;'>{status}</span>"
         f"</div>"
         f"<div style='background:rgba(30,41,59,0.8);border-radius:6px;height:14px;position:relative;overflow:hidden;'>"
-        f"<div style='width:{fill_w:.1f}%;height:100%;background:{color};'></div>"
-        f"{'<div style=\"position:absolute;left:' + f'{marker_pos:.1f}' + '%;width:' + f'{over_w:.1f}' + '%;height:100%;background:#EF4444;\"></div>' if is_over else ''}"
-        f"<div style='position:absolute;left:{marker_pos:.1f}%;top:0;width:2px;height:100%;background:#F8FAFC;z-index:1;'></div>"
+        f"<div style='width:{fpos:.1f}%;height:100%;background:{color};'></div>"
+        f"{'<div style=\"position:absolute;left:' + f'{gpos:.1f}' + '%;width:' + f'{opos:.1f}' + '%;height:100%;background:#EF4444;\"></div>' if ov else ''}"
+        f"<div style='position:absolute;left:{gpos:.1f}%;top:0;width:2px;height:100%;background:#F8FAFC;z-index:1;'></div>"
         f"</div></div>"
     )
 
