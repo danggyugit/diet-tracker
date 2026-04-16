@@ -17,10 +17,6 @@ st.set_page_config(
 # 상단 여백 조정 (사이드바 토글 버튼과 pills 겹침 방지)
 st.markdown("""<style>
 .block-container { padding-top:4rem !important; }
-[data-testid="stPills"] { display:flex; justify-content:center; }
-[data-testid="stPills"] > div { width:100% !important; }
-[data-testid="stPills"] [role="tablist"] { width:100% !important; display:flex !important; }
-[data-testid="stPills"] [role="tab"] { flex:1 !important; justify-content:center !important; }
 </style>""", unsafe_allow_html=True)
 
 render_sidebar_account()
@@ -41,21 +37,33 @@ PAGES = {
 
 pg = st.navigation(PAGES, position="sidebar")
 
-# ─── 상단 네비게이션 바 ──────────────────────────────────────
+# ─── 상단 네비게이션 바 (HTML grid + query_params) ────────────
 if is_logged_in():
-    NAV_MAP = {
-        "🍽️": "pages/record.py",
-        "📅": "pages/calendar_view.py",
-        "📊": "pages/trends.py",
-        "👤": "pages/profile.py",
-        "⭐": "pages/favorites.py",
-    }
-    selected = st.pills(
-        "nav", list(NAV_MAP.keys()),
-        selection_mode="single", default=None,
-        label_visibility="collapsed",
+    NAV_ITEMS = [
+        ("🍽️", "record", "pages/record.py"),
+        ("📅", "calendar", "pages/calendar_view.py"),
+        ("📊", "trends", "pages/trends.py"),
+        ("👤", "profile", "pages/profile.py"),
+        ("⭐", "favorites", "pages/favorites.py"),
+    ]
+    NAV_LOOKUP = {key: path for _, key, path in NAV_ITEMS}
+
+    qp = st.query_params
+    if "nav" in qp:
+        target = NAV_LOOKUP.get(qp["nav"])
+        del st.query_params["nav"]
+        if target:
+            st.switch_page(target)
+
+    btn_style = (
+        "background:rgba(30,41,59,0.5);border:1px solid rgba(148,163,184,0.2);"
+        "color:#F8FAFC;padding:10px 0;border-radius:10px;text-align:center;"
+        "text-decoration:none;font-size:20px;"
     )
-    if selected:
-        st.switch_page(NAV_MAP[selected])
+    nav_html = "<div style='display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-bottom:10px;'>"
+    for icon, key, _ in NAV_ITEMS:
+        nav_html += f"<a href='?nav={key}' target='_self' style='{btn_style}'>{icon}</a>"
+    nav_html += "</div>"
+    st.markdown(nav_html, unsafe_allow_html=True)
 
 pg.run()
