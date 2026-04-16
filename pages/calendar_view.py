@@ -66,26 +66,6 @@ if "cal_nav" in qp:
     del st.query_params["cal_nav"]
     st.rerun()
 
-nav_html = (
-    f"<div style='display:grid;grid-template-columns:1fr 2fr 1fr;"
-    f"gap:8px;align-items:center;margin:12px 0;'>"
-    f"<a href='?cal_nav=prev' target='_self' "
-    f"style='background:rgba(30,41,59,0.5);border:1px solid rgba(148,163,184,0.2);"
-    f"color:#F8FAFC;padding:10px 0;border-radius:8px;text-align:center;"
-    f"text-decoration:none;font-size:14px;font-weight:500;'>◀ 이전달</a>"
-    f"<a href='?cal_nav=current' target='_self' "
-    f"style='display:block;text-align:center;font-size:16px;font-weight:700;"
-    f"color:#F8FAFC;text-decoration:none;padding:10px 0;border-radius:8px;"
-    f"background:rgba(30,41,59,0.5);border:1px solid rgba(148,163,184,0.2);'>"
-    f"{today_kst().year}년 {today_kst().month}월</a>"
-    f"<a href='?cal_nav=next' target='_self' "
-    f"style='background:rgba(30,41,59,0.5);border:1px solid rgba(148,163,184,0.2);"
-    f"color:#F8FAFC;padding:10px 0;border-radius:8px;text-align:center;"
-    f"text-decoration:none;font-size:14px;font-weight:500;'>다음달 ▶</a>"
-    f"</div>"
-)
-st.markdown(nav_html, unsafe_allow_html=True)
-
 # ─── 연/월 드롭다운 선택 ─────────────────────────────────────
 _this_year = today_kst().year
 year_options = list(range(_this_year - 3, _this_year + 2))
@@ -115,6 +95,26 @@ if sel_year != st.session_state.cal_year or sel_month != st.session_state.cal_mo
     st.session_state.cal_year = sel_year
     st.session_state.cal_month = sel_month
     st.rerun()
+
+nav_html = (
+    f"<div style='display:grid;grid-template-columns:1fr 2fr 1fr;"
+    f"gap:8px;align-items:center;margin:12px 0;'>"
+    f"<a href='?cal_nav=prev' target='_self' "
+    f"style='background:rgba(30,41,59,0.5);border:1px solid rgba(148,163,184,0.2);"
+    f"color:#F8FAFC;padding:10px 0;border-radius:8px;text-align:center;"
+    f"text-decoration:none;font-size:14px;font-weight:500;'>◀ 이전달</a>"
+    f"<a href='?cal_nav=current' target='_self' "
+    f"style='display:block;text-align:center;font-size:16px;font-weight:700;"
+    f"color:#F8FAFC;text-decoration:none;padding:10px 0;border-radius:8px;"
+    f"background:rgba(30,41,59,0.5);border:1px solid rgba(148,163,184,0.2);'>"
+    f"{today_kst().year}년 {today_kst().month}월</a>"
+    f"<a href='?cal_nav=next' target='_self' "
+    f"style='background:rgba(30,41,59,0.5);border:1px solid rgba(148,163,184,0.2);"
+    f"color:#F8FAFC;padding:10px 0;border-radius:8px;text-align:center;"
+    f"text-decoration:none;font-size:14px;font-weight:500;'>다음달 ▶</a>"
+    f"</div>"
+)
+st.markdown(nav_html, unsafe_allow_html=True)
 
 year = st.session_state.cal_year
 month = st.session_state.cal_month
