@@ -93,13 +93,17 @@ if "selected_date_state" not in st.session_state:
 qp = st.query_params
 if "date_nav" in qp:
     nav = qp["date_nav"]
-    cur = st.session_state.selected_date_state
+    cur = st.session_state.get("date_picker", st.session_state.selected_date_state)
     if nav == "prev":
-        st.session_state.selected_date_state = cur - datetime.timedelta(days=1)
+        new_date = cur - datetime.timedelta(days=1)
     elif nav == "today":
-        st.session_state.selected_date_state = today_kst()
+        new_date = today_kst()
     elif nav == "next":
-        st.session_state.selected_date_state = cur + datetime.timedelta(days=1)
+        new_date = cur + datetime.timedelta(days=1)
+    else:
+        new_date = cur
+    st.session_state.selected_date_state = new_date
+    st.session_state.date_picker = new_date
     del st.query_params["date_nav"]
     st.rerun()
 
