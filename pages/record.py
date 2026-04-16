@@ -158,12 +158,15 @@ w_avg = float(w_totals["total_cal"].mean()) if not w_totals.empty else 0
 
 if remaining_cal > daily_budget * 0.3:
     bar_color = "#22C55E"
+    fill_color = "#22C55E"
     hero_text = f"남은 <b style='font-size:28px;'>{remaining_cal:,.0f}</b> kcal"
 elif remaining_cal > 0:
     bar_color = "#FBBF24"
+    fill_color = "#FBBF24"
     hero_text = f"남은 <b style='font-size:28px;'>{remaining_cal:,.0f}</b> kcal"
 else:
     bar_color = "#EF4444"
+    fill_color = "#FBBF24"
     hero_text = f"<b style='font-size:28px;'>{abs(remaining_cal):,.0f}</b> kcal 초과"
 
 is_over = net_cal > daily_budget
@@ -191,8 +194,8 @@ st.markdown(
     f"border-radius:12px;padding:14px;margin:4px 0;'>"
     f"<div style='text-align:center;color:{bar_color};margin-bottom:8px;'>{hero_text}</div>"
     f"<div style='background:rgba(15,23,42,0.6);border-radius:6px;height:14px;position:relative;overflow:hidden;'>"
-    f"<div style='width:{cal_fill_pos:.1f}%;height:100%;background:{bar_color};border-radius:6px 0 0 6px;'></div>"
-    f"{'<div style=\"position:absolute;left:' + f'{cal_goal_pos:.1f}' + '%;width:' + f'{cal_over_pos:.1f}' + '%;height:100%;background:#EF4444;\"></div>' if is_over else ''}"
+    f"<div style='width:{cal_fill_pos:.1f}%;height:100%;background:{fill_color};border-radius:6px 0 0 6px;'></div>"
+    f"{'<div style=\"position:absolute;top:0;left:' + f'{cal_goal_pos:.1f}' + '%;width:' + f'{cal_over_pos:.1f}' + '%;height:100%;background:#EF4444;\"></div>' if is_over else ''}"
     f"<div style='position:absolute;left:{cal_goal_pos:.1f}%;top:0;width:2px;height:100%;background:#F8FAFC;z-index:1;'></div>"
     f"</div>"
     f"<div style='display:flex;justify-content:space-between;font-size:11px;color:#94A3B8;margin-top:6px;'>"
@@ -230,7 +233,7 @@ def _bar_html(icon, name, cur, goal, color):
         f"</div>"
         f"<div style='background:rgba(30,41,59,0.8);border-radius:6px;height:14px;position:relative;overflow:hidden;'>"
         f"<div style='width:{fpos:.1f}%;height:100%;background:{color};'></div>"
-        f"{'<div style=\"position:absolute;left:' + f'{gpos:.1f}' + '%;width:' + f'{opos:.1f}' + '%;height:100%;background:#EF4444;\"></div>' if ov else ''}"
+        f"{'<div style=\"position:absolute;top:0;left:' + f'{gpos:.1f}' + '%;width:' + f'{opos:.1f}' + '%;height:100%;background:#EF4444;\"></div>' if ov else ''}"
         f"<div style='position:absolute;left:{gpos:.1f}%;top:0;width:2px;height:100%;background:#F8FAFC;z-index:1;'></div>"
         f"</div></div>"
     )
