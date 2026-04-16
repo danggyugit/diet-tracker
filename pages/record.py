@@ -86,30 +86,33 @@ target_carbs = max(round((daily_budget - target_protein * 4 - target_fat * 9) / 
 # 상단: 날짜 + 체중
 # ═══════════════════════════════════════════════════════════════
 
-if "selected_date_state" not in st.session_state:
-    st.session_state.selected_date_state = today_kst()
+if "rec_date" not in st.session_state:
+    st.session_state.rec_date = today_kst()
+if "date_ver" not in st.session_state:
+    st.session_state.date_ver = 0
 
 # 날짜 빠른 이동 (query_params 기반, 모바일 가로 강제)
 qp = st.query_params
 if "date_nav" in qp:
     nav = qp["date_nav"]
-    cur = st.session_state.get("date_picker", st.session_state.selected_date_state)
+    cur = st.session_state.rec_date
     if nav == "prev":
-        new_date = cur - datetime.timedelta(days=1)
+        st.session_state.rec_date = cur - datetime.timedelta(days=1)
     elif nav == "today":
-        new_date = today_kst()
+        st.session_state.rec_date = today_kst()
     elif nav == "next":
-        new_date = cur + datetime.timedelta(days=1)
-    else:
-        new_date = cur
-    st.session_state.selected_date_state = new_date
-    st.session_state.date_picker = new_date
+        st.session_state.rec_date = cur + datetime.timedelta(days=1)
+    st.session_state.date_ver += 1
     del st.query_params["date_nav"]
     st.rerun()
 
-selected_date = st.date_input("날짜", value=st.session_state.selected_date_state, key="date_picker")
-st.session_state.selected_date_state = selected_date
-date_str = selected_date.isoformat()
+selected_date = st.date_input(
+    "날짜", value=st.session_state.rec_date,
+    key=f"dp_{st.session_state.date_ver}",
+)
+if selected_date != st.session_state.rec_date:
+    st.session_state.rec_date = selected_date
+date_str = st.session_state.rec_date.isoformat()
 
 st.markdown(
     "<div style='display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin:4px 0 8px;'>"
