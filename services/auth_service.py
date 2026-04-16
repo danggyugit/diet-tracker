@@ -202,10 +202,10 @@ def _render_landing_page() -> None:
     with hc2:
         st.markdown(
             """
-            **🔒 데이터 투명성**
-            - 모든 기록은 본인 Google Sheets에 저장
-            - 언제든 직접 확인·수정·내보내기 가능
-            - 개인정보는 Google OAuth로 안전 관리
+            **⚡ 빠른 기록**
+            - 즐겨찾기 원터치 추가
+            - 어제 식단 1클릭 복사
+            - 사진 한 장으로 AI 자동 분석
             """
         )
         st.markdown(
@@ -235,7 +235,6 @@ def _render_landing_page() -> None:
             </div>
             <div style='line-height:1.8;'>
                 개인 식단·운동 관리 서비스 · Powered by Google Gemini AI<br>
-                본 서비스는 사용자의 식단 데이터를 Google Sheets에 안전하게 저장하며,<br>
                 제공되는 영양 정보는 참고용이며 의학적 조언을 대체하지 않습니다.<br>
                 <span style='color:#475569;'>© 2026 Diet Tracker · 문의: support@diet-tracker.app</span>
             </div>
