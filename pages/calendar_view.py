@@ -86,6 +86,36 @@ nav_html = (
 )
 st.markdown(nav_html, unsafe_allow_html=True)
 
+# ─── 연/월 드롭다운 선택 ─────────────────────────────────────
+_this_year = today_kst().year
+year_options = list(range(_this_year - 3, _this_year + 2))
+month_options = list(range(1, 13))
+
+if st.session_state.cal_year not in year_options:
+    year_options = sorted(set(year_options + [st.session_state.cal_year]))
+
+yc, mc = st.columns(2)
+sel_year = yc.selectbox(
+    "년도",
+    year_options,
+    index=year_options.index(st.session_state.cal_year),
+    key="cal_year_sel",
+    format_func=lambda y: f"{y}년",
+    label_visibility="collapsed",
+)
+sel_month = mc.selectbox(
+    "월",
+    month_options,
+    index=month_options.index(st.session_state.cal_month),
+    key="cal_month_sel",
+    format_func=lambda m: f"{m}월",
+    label_visibility="collapsed",
+)
+if sel_year != st.session_state.cal_year or sel_month != st.session_state.cal_month:
+    st.session_state.cal_year = sel_year
+    st.session_state.cal_month = sel_month
+    st.rerun()
+
 year = st.session_state.cal_year
 month = st.session_state.cal_month
 
