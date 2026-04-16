@@ -91,21 +91,6 @@ if "rec_date" not in st.session_state:
 if "date_ver" not in st.session_state:
     st.session_state.date_ver = 0
 
-# 날짜 빠른 이동 (query_params 기반, 모바일 가로 강제)
-qp = st.query_params
-if "date_nav" in qp:
-    nav = qp["date_nav"]
-    cur = st.session_state.rec_date
-    if nav == "prev":
-        st.session_state.rec_date = cur - datetime.timedelta(days=1)
-    elif nav == "today":
-        st.session_state.rec_date = today_kst()
-    elif nav == "next":
-        st.session_state.rec_date = cur + datetime.timedelta(days=1)
-    st.session_state.date_ver += 1
-    del st.query_params["date_nav"]
-    st.rerun()
-
 selected_date = st.date_input(
     "날짜", value=st.session_state.rec_date,
     key=f"dp_{st.session_state.date_ver}",
@@ -114,20 +99,27 @@ if selected_date != st.session_state.rec_date:
     st.session_state.rec_date = selected_date
 date_str = st.session_state.rec_date.isoformat()
 
+# 날짜 빠른 이동 (st.button + CSS 가로 강제)
 st.markdown(
-    "<div style='display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin:4px 0 8px;'>"
-    "<a href='?date_nav=prev' target='_self' style='background:rgba(30,41,59,0.5);"
-    "border:1px solid rgba(148,163,184,0.2);color:#F8FAFC;padding:8px 0;"
-    "border-radius:8px;text-align:center;text-decoration:none;font-size:13px;'>◀ 어제</a>"
-    "<a href='?date_nav=today' target='_self' style='background:rgba(30,41,59,0.5);"
-    "border:1px solid rgba(148,163,184,0.2);color:#F8FAFC;padding:8px 0;"
-    "border-radius:8px;text-align:center;text-decoration:none;font-size:13px;'>오늘</a>"
-    "<a href='?date_nav=next' target='_self' style='background:rgba(30,41,59,0.5);"
-    "border:1px solid rgba(148,163,184,0.2);color:#F8FAFC;padding:8px 0;"
-    "border-radius:8px;text-align:center;text-decoration:none;font-size:13px;'>내일 ▶</a>"
-    "</div>",
+    "<style>[data-testid='stColumns']:has(button) "
+    "{flex-wrap:nowrap!important;} "
+    "[data-testid='stColumns']:has(button) > div "
+    "{flex:1!important;min-width:0!important;}</style>",
     unsafe_allow_html=True,
 )
+_nc1, _nc2, _nc3 = st.columns(3)
+if _nc1.button("◀ 어제", use_container_width=True, key="btn_prev_day"):
+    st.session_state.rec_date -= datetime.timedelta(days=1)
+    st.session_state.date_ver += 1
+    st.rerun()
+if _nc2.button("오늘", use_container_width=True, key="btn_today_day"):
+    st.session_state.rec_date = today_kst()
+    st.session_state.date_ver += 1
+    st.rerun()
+if _nc3.button("내일 ▶", use_container_width=True, key="btn_next_day"):
+    st.session_state.rec_date += datetime.timedelta(days=1)
+    st.session_state.date_ver += 1
+    st.rerun()
 
 with st.expander("⚖️ 체중 기록", expanded=False):
     wc1, wc2 = st.columns([3, 1])
