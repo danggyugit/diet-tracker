@@ -13,13 +13,13 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
-from config import PLOT_CFG, PROTEIN_MULTIPLIERS, today_kst
+from config import PLOT_CFG, today_kst
 from services.auth_service import require_auth
 from services.sheets_service import (
     get_daily_totals, get_top_foods, get_meals,
     get_profile, get_weight_log, get_latest_weight, get_streak,
 )
-from services.calorie_service import calc_bmr, calc_tdee
+from services.calorie_service import calc_bmr, calc_tdee, calc_protein_g
 
 email = require_auth()
 st.title("📊 트렌드")
@@ -378,10 +378,9 @@ if not totals.empty:
         with pc_center:
             st.plotly_chart(fig_pie, use_container_width=True)
 
-        # 단백질 체크
+        # 단백질 체크 — 감량 강도 기반 (정석)
         pct_p = t_p / total_g * 100
-        protein_mult = PROTEIN_MULTIPLIERS.get(profile.get("activity_level", "보통활동"), 1.3)
-        target_p_per_day = latest_weight * protein_mult
+        target_p_per_day, protein_mult = calc_protein_g(latest_weight, deficit_level)
         avg_p_per_day = t_p / len(totals)
         if avg_p_per_day < target_p_per_day * 0.8:
             st.warning(

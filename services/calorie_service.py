@@ -1,8 +1,11 @@
-"""BMR / TDEE / 운동 소모 계산 서비스."""
+"""BMR / TDEE / 운동 소모 / 영양소 권장량 계산 서비스."""
 
 import math
 
-from config import ACTIVITY_MULTIPLIERS, EXERCISE_TABLE
+from config import (
+    ACTIVITY_MULTIPLIERS, EXERCISE_TABLE,
+    PROTEIN_BY_DEFICIT, FAT_MIN_PER_KG,
+)
 
 
 def calc_bmr(weight: float, height: float, age: int, gender: str) -> float:
@@ -23,6 +26,33 @@ def calc_tdee(bmr: float, activity_level: str) -> float:
     """일일 총 에너지 소비량(TDEE) = BMR × 활동계수."""
     multiplier = ACTIVITY_MULTIPLIERS.get(activity_level, 1.55)
     return bmr * multiplier
+
+
+def calc_protein_g(weight: float, deficit_level: int) -> tuple[int, float]:
+    """단백질 권장량 — 감량 강도 기반 (활동수준과 무관, 정석).
+
+    Returns: (g, g/kg)
+    """
+    mult = PROTEIN_BY_DEFICIT.get(deficit_level, 1.4)
+    return round(weight * mult), mult
+
+
+def calc_fat_g(daily_target: int, weight: float) -> tuple[int, str]:
+    """지방 권장량 — max(총 칼로리×30%, 체중×0.8g/kg).
+
+    체중 기반 최소치는 호르몬·지용성 비타민 흡수 보장용.
+    Returns: (g, source_label)
+    """
+    by_cal = daily_target * 0.30 / 9
+    by_weight = weight * FAT_MIN_PER_KG
+    if by_weight > by_cal:
+        return round(by_weight), "체중 0.8g/kg"
+    return round(by_cal), "총 칼로리 30%"
+
+
+def calc_carbs_g(daily_target: int, protein_g: int, fat_g: int) -> int:
+    """탄수화물 = 나머지 칼로리 ÷ 4 (최소 50g 보장)."""
+    return max(round((daily_target - protein_g * 4 - fat_g * 9) / 4), 50)
 
 
 def calc_daily_deficit(

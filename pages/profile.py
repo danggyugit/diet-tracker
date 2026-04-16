@@ -4,13 +4,15 @@ import datetime
 
 import streamlit as st
 
-from config import ACTIVITY_MULTIPLIERS, PROTEIN_MULTIPLIERS, today_kst
+from config import ACTIVITY_MULTIPLIERS, today_kst
 from services.auth_service import require_auth
 from services.sheets_service import (
     get_profile, save_profile, get_latest_weight,
     get_meals, get_weight_log, get_exercise_log,
 )
-from services.calorie_service import calc_bmr, calc_tdee
+from services.calorie_service import (
+    calc_bmr, calc_tdee, calc_protein_g, calc_fat_g, calc_carbs_g,
+)
 
 email = require_auth()
 st.title("👤 프로필")
@@ -19,13 +21,13 @@ st.title("👤 프로필")
 profile = get_profile(email) or {}
 latest_weight = get_latest_weight(email)
 
-# ─── 활동 수준 설명 ──────────────────────────────────────────
+# ─── 활동 수준 설명 (운동 제외, 일상 활동만 — NEAT 정석) ─────
 ACTIVITY_DESC = {
-    "비활동": "거의 운동 안 함 (사무직)",
-    "가벼운활동": "주 1-3일 가벼운 운동",
-    "보통활동": "주 3-5일 중간 강도",
-    "활발한활동": "주 6-7일 운동",
-    "매우활발": "매일 고강도, 육체노동",
+    "비활동": "사무직·종일 앉아서 (운동 별도 기록)",
+    "가벼운활동": "출퇴근 도보·가벼운 일상 (운동 별도 기록)",
+    "보통활동": "서서 일하거나 종일 활동적 (운동 별도 기록)",
+    "활발한활동": "육체노동 직업 (건설·물류 등)",
+    "매우활발": "운동선수·풀타임 트레이닝",
 }
 
 # ─── 감량 강도 옵션 (간결한 라벨) ─────────────────────────────
@@ -91,6 +93,19 @@ with st.form("profile_form"):
     st.caption(DEFICIT_DESC[deficit_level])
 
     st.markdown("---")
+    st.markdown("**🏃 운동 칼로리 보정**")
+    saved_comp = profile.get("exercise_compensation") or "off"
+    exercise_compensation = st.toggle(
+        "운동한 만큼 식단 칼로리 추가 허용",
+        value=(saved_comp == "on"),
+        help=(
+            "켜기: 최근 7일 평균 운동 소모량을 일일 목표에 더해서 식단 권장량을 늘림. "
+            "운동 많이 한 날 더 먹어도 OK. (정석 방식)\n"
+            "끄기: 운동은 추가 적자로만 작동. 식단 권장량은 고정."
+        ),
+    )
+
+    st.markdown("---")
     st.markdown("**목표 (참고)** — 감량 속도 예측용")
     gc1, gc2 = st.columns(2)
     with gc1:
@@ -109,24 +124,41 @@ with st.form("profile_form"):
 
 bmr = calc_bmr(weight, height, age, gender)
 tdee = calc_tdee(bmr, activity_level)
-daily_target = round(tdee - deficit_level)
+base_daily_target = round(tdee - deficit_level)
 
-protein_mult = PROTEIN_MULTIPLIERS.get(activity_level, 1.3)
-protein_g = round(weight * protein_mult)
-fat_g = round(daily_target * 0.30 / 9)
-protein_cal = protein_g * 4
-fat_cal = fat_g * 9
-carbs_g = max(round((daily_target - protein_cal - fat_cal) / 4), 50)
+# 운동 칼로리 보정 — 최근 7일 평균 운동 burn을 일일 목표에 추가
+end_d = today_kst()
+start_d = end_d - datetime.timedelta(days=7)
+ex_recent = get_exercise_log(email, start_d.isoformat(), end_d.isoformat())
+avg_burn_7d = (
+    int(ex_recent["calories_burned"].sum() / 7)
+    if not ex_recent.empty else 0
+)
+exercise_boost = avg_burn_7d if exercise_compensation else 0
+daily_target = base_daily_target + exercise_boost
+
+# 단백질 — 감량 강도 기반 (정석)
+protein_g, protein_mult = calc_protein_g(weight, deficit_level)
+# 지방 — max(총 칼로리 30%, 체중 0.8g/kg)
+fat_g, fat_source = calc_fat_g(daily_target, weight)
+# 탄수화물 — 나머지
+carbs_g = calc_carbs_g(daily_target, protein_g, fat_g)
 
 st.divider()
 
 # ─── 히어로 카드: 일일 섭취 목표 ──────────────────────────────
+boost_html = (
+    f"<div style='font-size:11px;color:#FBBF24;margin-top:6px;'>"
+    f"기본 {base_daily_target:,} + 운동 보정 +{exercise_boost:,} (최근 7일 평균)</div>"
+    if exercise_boost > 0 else ""
+)
 st.markdown(
     f"<div style='background:linear-gradient(135deg,rgba(34,197,94,0.15),rgba(59,130,246,0.15));"
     f"border:1px solid rgba(34,197,94,0.3);border-radius:14px;padding:18px;text-align:center;margin:8px 0 14px;'>"
     f"<div style='font-size:13px;color:#94A3B8;margin-bottom:4px;'>오늘의 섭취 목표</div>"
     f"<div style='font-size:36px;font-weight:800;color:#22C55E;line-height:1.1;'>{daily_target:,}</div>"
     f"<div style='font-size:13px;color:#CBD5E1;margin-top:2px;'>kcal / 일</div>"
+    f"{boost_html}"
     f"</div>",
     unsafe_allow_html=True,
 )
@@ -170,15 +202,15 @@ st.markdown(
     f"border-radius:10px;padding:12px;text-align:center;'>"
     f"<div style='font-size:11px;color:#FBBF24;'>🧈 지방</div>"
     f"<div style='font-size:20px;font-weight:700;margin-top:2px;'>{fat_g}g</div>"
-    f"<div style='font-size:10px;color:#64748B;'>30%</div></div>"
+    f"<div style='font-size:10px;color:#64748B;'>{fat_source}</div></div>"
     f"</div>",
     unsafe_allow_html=True,
 )
 
 st.caption(
-    f"단백질 {weight:.0f}kg × {protein_mult} = {protein_g}g · "
-    f"지방 {daily_target:,} × 30% = {fat_g}g · "
-    f"탄수화물 = {carbs_g}g (나머지)"
+    f"단백질 {weight:.0f}kg × {protein_mult}g (감량강도 기반) = {protein_g}g · "
+    f"지방 {fat_source} = {fat_g}g · "
+    f"탄수화물 {carbs_g}g (나머지)"
 )
 
 # ─── 체중 진행률 바 ──────────────────────────────────────────
@@ -276,6 +308,7 @@ if submitted:
         "activity_level": activity_level, "target_calories": 0,
         "target_weight": target_weight, "target_date": target_date.isoformat(),
         "deficit_level": deficit_level,
+        "exercise_compensation": "on" if exercise_compensation else "off",
     })
     st.success("프로필이 저장되었습니다!")
     st.rerun()

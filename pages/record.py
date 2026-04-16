@@ -14,11 +14,14 @@ import streamlit as st
 
 from config import (
     MEAL_TYPES, MAX_FILE_SIZE, PLOT_CFG, CONDITION_OPTIONS,
-    EXERCISE_OPTIONS, WATER_TARGET_ML, PROTEIN_MULTIPLIERS, today_kst,
+    EXERCISE_OPTIONS, WATER_TARGET_ML, today_kst,
 )
 from services.auth_service import require_auth
 from services.gemini_service import analyze_food_image, estimate_multiple_foods
-from services.calorie_service import calc_bmr, calc_tdee, calc_exercise_plan
+from services.calorie_service import (
+    calc_bmr, calc_tdee, calc_exercise_plan,
+    calc_protein_g, calc_fat_g, calc_carbs_g,
+)
 from services.sheets_service import (
     get_profile, get_meals_for_date, save_meals, delete_meal_row, update_meal_row,
     delete_meals_by_type,
@@ -75,13 +78,20 @@ try:
     deficit_level = int(profile.get("deficit_level") or 700)
 except (ValueError, TypeError):
     deficit_level = 700
-daily_budget = round(tdee - deficit_level)
+base_budget = round(tdee - deficit_level)
 
-activity = profile.get("activity_level", "보통활동")
-protein_mult = PROTEIN_MULTIPLIERS.get(activity, 1.3)
-target_protein = round(latest_weight * protein_mult)
-target_fat = round(daily_budget * 0.30 / 9)
-target_carbs = max(round((daily_budget - target_protein * 4 - target_fat * 9) / 4), 50)
+# 운동 칼로리 보정 — 최근 7일 평균
+exercise_compensation = (profile.get("exercise_compensation") or "off") == "on"
+_end_d = today_kst()
+_start_d = _end_d - datetime.timedelta(days=7)
+_ex7 = get_exercise_log(email, _start_d.isoformat(), _end_d.isoformat())
+avg_burn_7d = int(_ex7["calories_burned"].sum() / 7) if not _ex7.empty else 0
+exercise_boost = avg_burn_7d if exercise_compensation else 0
+daily_budget = base_budget + exercise_boost
+
+target_protein, protein_mult = calc_protein_g(latest_weight, deficit_level)
+target_fat, _fat_source = calc_fat_g(daily_budget, latest_weight)
+target_carbs = calc_carbs_g(daily_budget, target_protein, target_fat)
 
 # ═══════════════════════════════════════════════════════════════
 # 상단: 날짜 + 체중

@@ -28,7 +28,19 @@ ACTIVITY_MULTIPLIERS: dict[str, float] = {
     "매우활발": 1.9,
 }
 
-# 활동 수준별 단백질 계수 (g/kg)
+# 단백질 권장 계수 (g/kg) — 감량 강도 기반 (스포츠 영양학 정석)
+# ISSN/ACSM: 체중 감량 + 운동 시 1.6~2.2g/kg, 유지 1.4g/kg, 일반 1.0g/kg
+PROTEIN_BY_DEFICIT: dict[int, float] = {
+    1000: 2.0,   # 강한 감량 — 근손실 방지 최대치
+    700: 1.8,    # 보통 감량 — 일반 권장
+    500: 1.6,    # 가벼운 감량
+    0: 1.4,      # 유지
+}
+
+# 지방 최소치 (g/kg) — 호르몬·지용성 비타민 흡수 보장
+FAT_MIN_PER_KG: float = 0.8
+
+# (구) 활동 수준별 단백질 계수 — 하위 호환용, 신규 코드는 PROTEIN_BY_DEFICIT 사용
 PROTEIN_MULTIPLIERS: dict[str, float] = {
     "비활동": 1.0,
     "가벼운활동": 1.2,
@@ -69,7 +81,7 @@ PROFILES_HEADERS = [
     "email", "gender", "age", "height", "weight",
     "activity_level", "target_calories",
     "target_weight", "target_date",
-    "deficit_level",
+    "deficit_level", "exercise_compensation",
     "updated_at",
 ]
 MEMOS_HEADERS = ["email", "date", "condition", "memo", "created_at"]
