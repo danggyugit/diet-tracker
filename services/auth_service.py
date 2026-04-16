@@ -48,6 +48,41 @@ def _render_landing_page() -> None:
             st.login("google")
         st.caption("무료 · Google 계정만 있으면 바로 사용 가능")
 
+    # ─── 📱 홈 화면 추가 배너 ────────────────────────────────
+    st.markdown(
+        """
+        <div style='background:linear-gradient(135deg,rgba(59,130,246,0.18),rgba(139,92,246,0.18));
+                    border:1px solid rgba(59,130,246,0.4);border-radius:14px;
+                    padding:16px 18px;margin:20px 0 10px;'>
+            <div style='display:flex;align-items:center;gap:12px;margin-bottom:10px;'>
+                <div style='font-size:32px;'>📱</div>
+                <div>
+                    <div style='font-weight:700;font-size:16px;color:#F8FAFC;'>
+                        매일 쓰려면 홈 화면에 추가하세요
+                    </div>
+                    <div style='font-size:12px;color:#94A3B8;margin-top:2px;'>
+                        1초 접근 · 매일 식단 기록이 훨씬 쉬워집니다
+                    </div>
+                </div>
+            </div>
+            <div style='display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:13px;color:#CBD5E1;'>
+                <div style='background:rgba(15,23,42,0.4);padding:10px;border-radius:8px;'>
+                    <b style='color:#60A5FA;'>🤖 Android</b><br>
+                    <span style='font-size:12px;'>Chrome ⋮ → "홈 화면에 추가"</span>
+                </div>
+                <div style='background:rgba(15,23,42,0.4);padding:10px;border-radius:8px;'>
+                    <b style='color:#A78BFA;'>🍎 iOS</b><br>
+                    <span style='font-size:12px;'>Safari 공유 → "홈 화면에 추가"</span>
+                </div>
+            </div>
+            <div style='text-align:center;font-size:11px;color:#64748B;margin-top:10px;'>
+                로그인 후 사이드바 <b>도움말 → 사용 메뉴얼</b>에서 상세 가이드 제공
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
     st.markdown("---")
 
     # ─── 주요 기능 ──────────────────────────────────────────
