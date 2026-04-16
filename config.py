@@ -106,13 +106,14 @@ FAVORITES_HEADERS = [
 
 # 운동 선택 목록 (기록용, MET 포함)
 EXERCISE_OPTIONS = [
+    {"name": "골프 (연습)",       "met": 3.5, "icon": "⛳"},
+    {"name": "골프 (라운드)",     "met": 4.8, "icon": "⛳"},
+    {"name": "강아지 산책",       "met": 3.0, "icon": "🐕"},
     {"name": "걷기 (빠른 걸음)", "met": 4.5, "icon": "🚶"},
     {"name": "러닝 (조깅)",       "met": 7.0, "icon": "🏃"},
     {"name": "러닝 (빠른 페이스)","met": 9.8, "icon": "🏃‍♂️"},
     {"name": "자전거",            "met": 7.5, "icon": "🚴"},
     {"name": "수영",              "met": 8.0, "icon": "🏊"},
-    {"name": "골프 (연습)",       "met": 3.5, "icon": "⛳"},
-    {"name": "골프 (라운드)",     "met": 4.8, "icon": "⛳"},
     {"name": "등산",              "met": 6.0, "icon": "🥾"},
     {"name": "요가/스트레칭",     "met": 2.5, "icon": "🧘"},
     {"name": "웨이트 트레이닝",   "met": 5.0, "icon": "🏋️"},
@@ -120,7 +121,6 @@ EXERCISE_OPTIONS = [
     {"name": "테니스",            "met": 7.0, "icon": "🎾"},
     {"name": "축구",              "met": 7.0, "icon": "⚽"},
     {"name": "농구",              "met": 6.5, "icon": "🏀"},
-    {"name": "강아지 산책",       "met": 3.0, "icon": "🐕"},
     {"name": "집안일/청소",       "met": 3.5, "icon": "🧹"},
     {"name": "계단 오르기",       "met": 8.0, "icon": "🪜"},
     {"name": "줄넘기",            "met": 10.0,"icon": "🪢"},
