@@ -170,7 +170,8 @@ else:
     hero_text = f"<b style='font-size:28px;'>{abs(remaining_cal):,.0f}</b> kcal 초과"
 
 is_over = net_cal > daily_budget
-_cal_max = max(net_cal, daily_budget, 1) * 1.08
+_cal_max = net_cal * 1.02 if is_over else daily_budget * 1.08
+_cal_max = max(_cal_max, 1)
 cal_goal_pos = daily_budget / _cal_max * 100
 cal_fill_pos = min(net_cal, daily_budget) / _cal_max * 100
 cal_over_pos = max(net_cal - daily_budget, 0) / _cal_max * 100
@@ -218,7 +219,8 @@ t_protein = float(today_totals["total_protein"].sum()) if not today_totals.empty
 t_fat = float(today_totals["total_fat"].sum()) if not today_totals.empty and "total_fat" in today_totals.columns else 0
 
 def _bar_html(icon, name, cur, goal, color):
-    bmax = max(cur, goal, 1) * 1.08
+    bmax = cur * 1.02 if cur > goal else goal * 1.08
+    bmax = max(bmax, 1)
     gpos = goal / bmax * 100
     fpos = min(cur, goal) / bmax * 100
     opos = max(cur - goal, 0) / bmax * 100
