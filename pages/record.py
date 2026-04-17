@@ -711,10 +711,10 @@ else:
                     st.markdown(f"**{row['food_name']}** 수정")
                     ec1, ec2 = st.columns(2)
                     edit_cal = ec1.number_input("칼로리 (kcal)", value=int(row["calories"]), min_value=0)
-                    edit_qty = ec2.number_input("인분", value=float(row["quantity"]), min_value=0.5, max_value=10.0, step=0.5)
+                    edit_qty = ec2.number_input("인분", value=float(row["quantity"]), min_value=0.25, max_value=10.0, step=0.25)
                     st.caption("빠른 인분 선택:")
                     qc = st.columns(4)
-                    for i, q in enumerate([0.5, 1.0, 1.5, 2.0]):
+                    for i, q in enumerate([0.25, 0.5, 1.0, 1.5]):
                         if qc[i].form_submit_button(f"{q}인분", use_container_width=True):
                             edit_qty = q
                     ec3, ec4, ec5 = st.columns(3)
