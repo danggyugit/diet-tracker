@@ -18,6 +18,7 @@ from services.auth_service import require_auth
 from services.sheets_service import (
     get_daily_totals, get_top_foods, get_meals,
     get_profile, get_weight_log, get_latest_weight, get_streak,
+    get_exercise_log,
 )
 from services.calorie_service import calc_bmr, calc_tdee, calc_protein_g
 
@@ -48,6 +49,13 @@ start = (today - datetime.timedelta(days=days - 1)).isoformat()
 end = today.isoformat()
 totals = get_daily_totals(email, start, end)
 weight_log = get_weight_log(email, start, end)
+
+# 운동 burn 일자별 매핑 (트렌드 표 + 평가용)
+ex_period = get_exercise_log(email, start, end)
+if not ex_period.empty:
+    burn_by_date = ex_period.groupby("date")["calories_burned"].sum().to_dict()
+else:
+    burn_by_date = {}
 
 # ═══════════════════════════════════════════════════════════════
 # 섹션 1: 한눈에 보기 (핵심 지표 + 평가)
@@ -241,7 +249,7 @@ else:
 
 # ─── 칼로리 섭취 추이 (표 형식) ──────────────────────────────
 st.markdown("#### 🔥 일별 칼로리 섭취")
-st.caption("날짜별 섭취량과 목표 대비 차이를 한눈에 확인하세요.")
+st.caption(f"순칼로리(섭취-운동) 기준 평가 · 목표 {target:,} kcal")
 
 if totals.empty:
     st.info("📝 식단 기록이 없습니다.")
@@ -252,24 +260,33 @@ else:
     totals_display["날짜"] = totals_display["date_dt"].apply(
         lambda d: f"{d.month}/{d.day} ({weekday_names[d.weekday()]})"
     )
-    totals_display["섭취"] = totals_display["total_cal"].apply(lambda c: f"{c:,.0f} kcal")
-    totals_display["차이"] = totals_display["total_cal"].apply(
-        lambda c: f"{int(c - target):+,} kcal"
+    totals_display["burned"] = totals_display["date"].apply(
+        lambda d: float(burn_by_date.get(d, 0))
     )
-    totals_display["평가"] = totals_display["total_cal"].apply(
+    totals_display["net"] = totals_display["total_cal"] - totals_display["burned"]
+
+    totals_display["섭취"] = totals_display["total_cal"].apply(lambda c: f"{c:,.0f}")
+    totals_display["운동"] = totals_display["burned"].apply(
+        lambda c: f"-{c:,.0f}" if c > 0 else "—"
+    )
+    totals_display["순칼로리"] = totals_display["net"].apply(lambda c: f"{c:,.0f}")
+    totals_display["차이"] = totals_display["net"].apply(
+        lambda c: f"{int(c - target):+,}"
+    )
+    totals_display["평가"] = totals_display["net"].apply(
         lambda c: "🔴 초과" if c > target * 1.05 else ("🟡 근접" if c > target else "✅ 이하")
     )
-    display_df = totals_display[["날짜", "섭취", "차이", "평가"]].sort_values("날짜", ascending=False)
+    display_df = totals_display[["날짜", "섭취", "운동", "순칼로리", "차이", "평가"]].sort_values("날짜", ascending=False)
     st.dataframe(display_df, use_container_width=True, hide_index=True, height=min(len(display_df) * 36 + 38, 400))
 
-    # 인사이트 문장
-    over_days = int((totals["total_cal"] > target).sum())
-    under_days = int((totals["total_cal"] <= target).sum())
-    total_days = len(totals)
+    # 인사이트 문장 (순칼로리 기준)
+    over_days = int((totals_display["net"] > target).sum())
+    under_days = int((totals_display["net"] <= target).sum())
+    total_days = len(totals_display)
     if over_days > total_days * 0.5:
-        st.warning(f"⚠️ {total_days}일 중 {over_days}일 목표 초과 — 식단 조절이 필요합니다.")
+        st.warning(f"⚠️ {total_days}일 중 {over_days}일 순칼로리 목표 초과 — 식단 조절이 필요합니다.")
     elif under_days > total_days * 0.7:
-        st.success(f"✅ {total_days}일 중 {under_days}일 목표 이하 — 순항 중!")
+        st.success(f"✅ {total_days}일 중 {under_days}일 순칼로리 목표 이하 — 순항 중!")
 
 # ═══════════════════════════════════════════════════════════════
 # 섹션 3: 패턴 발견
