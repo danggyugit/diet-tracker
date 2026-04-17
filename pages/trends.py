@@ -37,7 +37,8 @@ try:
     deficit_level = int(profile.get("deficit_level") or 700)
 except (ValueError, TypeError):
     deficit_level = 700
-target = round(tdee - deficit_level)
+base_target = round(tdee - deficit_level)
+target = base_target  # 하위 호환: 기존 차트 참조용
 
 # ─── 기간 선택 ───────────────────────────────────────────────
 period = st.radio("기간", ["7일", "30일", "90일"], horizontal=True)
@@ -334,7 +335,8 @@ else:
 # ─── 칼로리 섭취 추이 (표 형식, 5단계 평가) ──────────────────
 st.markdown("#### 🔥 일별 칼로리 상세")
 _eval_mode_label = "순칼로리" if use_net_for_eval else "섭취 칼로리"
-st.caption(f"{_eval_mode_label} 기준 평가 · 목표 {target:,} kcal")
+_target_label = f"기본 {base_target:,}" + (" + 운동 보정" if use_net_for_eval else "")
+st.caption(f"섭취 칼로리 vs 일별 effective target 평가 · {_target_label} kcal")
 
 if not totals.empty:
     totals_display = totals.copy()
@@ -347,30 +349,40 @@ if not totals.empty:
     )
     totals_display["net"] = totals_display["total_cal"] - totals_display["burned"]
 
-    # 보정 모드에 따라 평가 대상 결정
-    eval_col = "net" if use_net_for_eval else "total_cal"
+    # 일별 effective target 계산 (식단 기록 페이지와 동일 기준)
+    if exercise_comp_mode == "daily":
+        totals_display["eff_target"] = totals_display["burned"].apply(
+            lambda b: base_target + int(b)
+        )
+    elif exercise_comp_mode == "avg7":
+        _avg7 = int(totals_display["burned"].sum() / len(totals_display)) if len(totals_display) else 0
+        totals_display["eff_target"] = base_target + _avg7
+    else:
+        totals_display["eff_target"] = base_target
 
+    # 평가: 섭취 vs effective target (모든 모드 통일)
     totals_display["섭취"] = totals_display["total_cal"].apply(lambda c: f"{c:,.0f}")
+    totals_display["목표"] = totals_display["eff_target"].apply(lambda t: f"{t:,.0f}")
     totals_display["운동"] = totals_display["burned"].apply(
         lambda c: f"-{c:,.0f}" if c > 0 else "—"
     )
-    totals_display["순칼로리"] = totals_display["net"].apply(lambda c: f"{c:,.0f}")
-    totals_display["차이"] = totals_display[eval_col].apply(
-        lambda c: f"{int(c - target):+,}"
+    totals_display["차이"] = totals_display.apply(
+        lambda r: f"{int(r['total_cal'] - r['eff_target']):+,}", axis=1
     )
-    totals_display["평가"] = totals_display[eval_col].apply(
-        lambda c: evaluate_calorie_status(c, target)[0]
+    totals_display["평가"] = totals_display.apply(
+        lambda r: evaluate_calorie_status(r["total_cal"], r["eff_target"])[0], axis=1
     )
 
+    cols = ["날짜", "섭취", "목표", "차이", "평가"]
     if use_net_for_eval:
-        cols = ["날짜", "섭취", "운동", "순칼로리", "차이", "평가"]
-    else:
-        cols = ["날짜", "섭취", "차이", "평가"]
+        cols = ["날짜", "섭취", "운동", "목표", "차이", "평가"]
     display_df = totals_display[cols].sort_values("날짜", ascending=False)
     st.dataframe(display_df, use_container_width=True, hide_index=True, height=min(len(display_df) * 36 + 38, 400))
 
     # 인사이트 (4단계 기반)
-    eval_results = totals_display[eval_col].apply(lambda c: evaluate_calorie_status(c, target)[2])
+    eval_results = totals_display.apply(
+        lambda r: evaluate_calorie_status(r["total_cal"], r["eff_target"])[2], axis=1
+    )
     n_over = int((eval_results == "over").sum())
     n_too_low = int((eval_results == "too_low").sum())
     total_days = len(totals_display)

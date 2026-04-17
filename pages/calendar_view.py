@@ -36,7 +36,15 @@ try:
     deficit_level = int(profile.get("deficit_level") or 700)
 except (ValueError, TypeError):
     deficit_level = 700
-target = round(tdee - deficit_level)
+base_target = round(tdee - deficit_level)
+
+# 운동 보정 모드 (off / avg7 / daily)
+_comp_raw = (profile.get("exercise_compensation") or "off").lower()
+if _comp_raw == "on":
+    _comp_raw = "avg7"
+if _comp_raw not in ("off", "avg7", "daily"):
+    _comp_raw = "off"
+cal_comp_mode = _comp_raw
 
 # ─── 월/년 네비게이터 (모바일 가로 강제) ────────────────────
 if "cal_year" not in st.session_state:
@@ -130,8 +138,9 @@ if year != today_kst().year or month != today_kst().month:
 first_day = datetime.date(year, month, 1)
 last_day = datetime.date(year, month, calendar.monthrange(year, month)[1])
 totals_df = get_daily_totals(email, first_day.isoformat(), last_day.isoformat())
-daily_eaten, daily_burned_map, daily_net = {}, {}, {}
+daily_eaten, daily_burned_map, daily_net, daily_target = {}, {}, {}, {}
 if not totals_df.empty:
+    all_burns = []
     for _, row in totals_df.iterrows():
         d = row["date"]
         eaten = int(row["total_cal"])
@@ -139,6 +148,17 @@ if not totals_df.empty:
         daily_eaten[d] = eaten
         daily_burned_map[d] = burned
         daily_net[d] = eaten - burned
+        all_burns.append(burned)
+
+    # 보정 모드별 일별 effective target
+    avg7_burn = int(sum(all_burns) / len(all_burns)) if all_burns else 0
+    for d in daily_eaten:
+        if cal_comp_mode == "daily":
+            daily_target[d] = base_target + daily_burned_map.get(d, 0)
+        elif cal_comp_mode == "avg7":
+            daily_target[d] = base_target + avg7_burn
+        else:
+            daily_target[d] = base_target
 
 # ─── HTML 캘린더 테이블 ──────────────────────────────────────
 cal_obj = calendar.Calendar(firstweekday=0)
@@ -146,11 +166,10 @@ weeks = cal_obj.monthdatescalendar(year, month)
 today = today_kst()
 
 
-def _cell_color(cal_val: int) -> tuple[str, str]:
+def _cell_color(cal_val: int, day_target: int) -> tuple[str, str]:
     if cal_val == 0:
         return "rgba(30,41,59,0.5)", "#64748B"
-    pct = cal_val / target * 100 if target > 0 else 0
-    # 4단계: 너무 적음 / 적정 / 근접 / 초과
+    pct = cal_val / day_target * 100 if day_target > 0 else 0
     if cal_val < 1200 or pct < 60:
         return "rgba(96,165,250,0.3)", "#60A5FA"    # 🔵 너무 적음
     elif pct <= 95:
@@ -189,7 +208,10 @@ for week in weeks:
         burned = daily_burned_map.get(date_key, 0)
         net = daily_net.get(date_key, 0)
         has_data = eaten > 0 or burned > 0
-        bg, text_color = _cell_color(net) if has_data else ("rgba(30,41,59,0.25)", "#475569")
+        dt = daily_target.get(date_key, base_target)
+        # 보정 ON: 섭취 vs effective target, OFF: 순 vs base
+        eval_val = eaten if cal_comp_mode != "off" else net
+        bg, text_color = _cell_color(eval_val, dt) if has_data else ("rgba(30,41,59,0.25)", "#475569")
         is_today = day == today
         is_selected = sel_date_state == day
         if is_selected:
@@ -230,7 +252,9 @@ st.markdown(
     f"<div>🔵 너무 적음</div><div>🟢 적정</div><div>🟡 근접</div><div>🔴 초과</div>"
     f"</div>"
     f"<div style='text-align:center;font-size:11px;color:#64748B;margin-top:2px;'>"
-    f"목표 {target:,} kcal</div>",
+    f"기본 목표 {base_target:,} kcal"
+    f"{' + 운동 보정' if cal_comp_mode != 'off' else ''}"
+    f"</div>",
     unsafe_allow_html=True,
 )
 

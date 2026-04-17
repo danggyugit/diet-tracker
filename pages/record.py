@@ -178,7 +178,12 @@ today_totals = get_daily_totals(email, date_str, date_str)
 eaten_cal = float(today_totals["total_cal"].sum()) if not today_totals.empty else 0
 burned_cal = get_daily_burned(email, date_str)
 net_cal = eaten_cal - burned_cal
-remaining_cal = daily_budget - net_cal
+# 보정 ON: 섭취 vs effective target (운동은 이미 target에 포함)
+# 보정 OFF: 순칼로리 vs base target (운동은 추가 적자)
+if exercise_comp_mode != "off":
+    remaining_cal = daily_budget - eaten_cal
+else:
+    remaining_cal = daily_budget - net_cal
 
 # 어제 비교
 yesterday = (selected_date - datetime.timedelta(days=1)).isoformat()
@@ -190,8 +195,8 @@ week_start = (selected_date - datetime.timedelta(days=7)).isoformat()
 w_totals = get_daily_totals(email, week_start, date_str)
 w_avg = float(w_totals["total_cal"].mean()) if not w_totals.empty else 0
 
-# 4단계 평가 (너무 적음 / 적정 / 근접 / 초과)
-_eval_value = net_cal if exercise_comp_mode != "off" else eaten_cal
+# 4단계 평가 — 보정 ON: 섭취 vs effective, OFF: 순 vs base
+_eval_value = eaten_cal if exercise_comp_mode != "off" else net_cal
 _eval_label, _eval_color, _eval_level = evaluate_calorie_status(_eval_value, daily_budget)
 
 if _eval_level == "too_low":
