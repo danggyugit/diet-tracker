@@ -222,14 +222,24 @@ for week in weeks:
             border = "1px solid rgba(148,163,184,0.15)"
 
         if has_data:
-            if eaten > 0 and burned > 0:
-                detail = f"<div class='cal-detail'>식{eaten:,}·운{burned:,}</div>"
-            elif eaten > 0:
-                detail = f"<div class='cal-detail'>식{eaten:,}</div>"
+            # 보정 ON: 메인 = 섭취, 서브 = 목표
+            # 보정 OFF: 메인 = 순, 서브 = 식·운 분해
+            if cal_comp_mode != "off":
+                main_val = eaten
+                if burned > 0:
+                    detail = f"<div class='cal-detail'>목표{dt:,}</div>"
+                else:
+                    detail = ""
             else:
-                detail = f"<div class='cal-detail'>운{burned:,}</div>"
+                main_val = net
+                if eaten > 0 and burned > 0:
+                    detail = f"<div class='cal-detail'>식{eaten:,}·운{burned:,}</div>"
+                elif eaten > 0:
+                    detail = f"<div class='cal-detail'>식{eaten:,}</div>"
+                else:
+                    detail = f"<div class='cal-detail'>운{burned:,}</div>"
             body = (
-                f"<div class='cal-val' style='color:{text_color};'>{net:,}</div>"
+                f"<div class='cal-val' style='color:{text_color};'>{main_val:,}</div>"
                 f"{detail}"
             )
         else:
