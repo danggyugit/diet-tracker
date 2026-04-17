@@ -72,12 +72,12 @@ def _ensure_headers(ws: gspread.Worksheet, headers: list[str]) -> None:
 # ─── Profiles ────────────────────────────────────────────────
 
 @st.cache_data(ttl=300)
-def get_profile(_email: str) -> dict | None:
+def get_profile(email: str) -> dict | None:
     ws = _get_worksheet(WS_PROFILES)
     _ensure_headers(ws, PROFILES_HEADERS)
     records = ws.get_all_records()
     for r in records:
-        if r.get("email") == _email:
+        if r.get("email") == email:
             return r
     return None
 
@@ -120,14 +120,14 @@ def save_profile(email: str, data: dict) -> None:
 # ─── Meals ────────────────────────────────────────────────
 
 @st.cache_data(ttl=300)
-def get_meals(_email: str, start_date: str, end_date: str) -> pd.DataFrame:
+def get_meals(email: str, start_date: str, end_date: str) -> pd.DataFrame:
     ws = _get_worksheet(WS_MEALS)
     _ensure_headers(ws, MEALS_HEADERS)
     records = ws.get_all_records()
     if not records:
         return pd.DataFrame(columns=MEALS_HEADERS)
     df = pd.DataFrame(records)
-    mask = (df["email"] == _email) & (df["date"] >= start_date) & (df["date"] <= end_date)
+    mask = (df["email"] == email) & (df["date"] >= start_date) & (df["date"] <= end_date)
     return df[mask].reset_index(drop=True)
 
 
@@ -224,21 +224,21 @@ def update_meal_row(email: str, date: str, food_name: str, created_at: str,
 
 
 @st.cache_data(ttl=300)
-def get_all_meals_for_year(_email: str, year: int) -> pd.DataFrame:
+def get_all_meals_for_year(email: str, year: int) -> pd.DataFrame:
     start = f"{year}-01-01"
     end = f"{year}-12-31"
-    return get_meals(_email, start, end)
+    return get_meals(email, start, end)
 
 
 # ─── Memos ────────────────────────────────────────────────
 
 @st.cache_data(ttl=300)
-def get_memo(_email: str, date: str) -> dict | None:
+def get_memo(email: str, date: str) -> dict | None:
     ws = _get_worksheet(WS_MEMOS)
     _ensure_headers(ws, MEMOS_HEADERS)
     records = ws.get_all_records()
     for r in records:
-        if r.get("email") == _email and r.get("date") == date:
+        if r.get("email") == email and r.get("date") == date:
             return r
     return None
 
@@ -266,25 +266,25 @@ def save_memo(email: str, date: str, condition: str, memo: str) -> None:
 # ─── Weight Log ──────────────────────────────────────────────
 
 @st.cache_data(ttl=300)
-def get_weight_log(_email: str, start_date: str, end_date: str) -> pd.DataFrame:
+def get_weight_log(email: str, start_date: str, end_date: str) -> pd.DataFrame:
     ws = _get_worksheet(WS_WEIGHT_LOG)
     _ensure_headers(ws, WEIGHT_LOG_HEADERS)
     records = ws.get_all_records()
     if not records:
         return pd.DataFrame(columns=WEIGHT_LOG_HEADERS)
     df = pd.DataFrame(records)
-    mask = (df["email"] == _email) & (df["date"] >= start_date) & (df["date"] <= end_date)
+    mask = (df["email"] == email) & (df["date"] >= start_date) & (df["date"] <= end_date)
     result = df[mask].reset_index(drop=True)
     result["weight"] = pd.to_numeric(result["weight"], errors="coerce")
     return result.sort_values("date")
 
 
 @st.cache_data(ttl=300)
-def get_latest_weight(_email: str) -> float | None:
+def get_latest_weight(email: str) -> float | None:
     ws = _get_worksheet(WS_WEIGHT_LOG)
     _ensure_headers(ws, WEIGHT_LOG_HEADERS)
     records = ws.get_all_records()
-    user_records = [r for r in records if r.get("email") == _email]
+    user_records = [r for r in records if r.get("email") == email]
     if not user_records:
         return None
     latest = max(user_records, key=lambda r: r.get("date", ""))
@@ -295,12 +295,12 @@ def get_latest_weight(_email: str) -> float | None:
 
 
 @st.cache_data(ttl=300)
-def get_earliest_weight(_email: str) -> float | None:
+def get_earliest_weight(email: str) -> float | None:
     """가장 오래된 체중 기록 (시작 체중 표시용)."""
     ws = _get_worksheet(WS_WEIGHT_LOG)
     _ensure_headers(ws, WEIGHT_LOG_HEADERS)
     records = ws.get_all_records()
-    user_records = [r for r in records if r.get("email") == _email and r.get("date")]
+    user_records = [r for r in records if r.get("email") == email and r.get("date")]
     if not user_records:
         return None
     earliest = min(user_records, key=lambda r: r.get("date", ""))
@@ -449,14 +449,14 @@ def update_exercise_row(email: str, date: str, exercise_name: str, created_at: s
 
 
 @st.cache_data(ttl=300)
-def get_exercise_log(_email: str, start_date: str, end_date: str) -> pd.DataFrame:
+def get_exercise_log(email: str, start_date: str, end_date: str) -> pd.DataFrame:
     ws = _get_worksheet(WS_EXERCISE_LOG)
     _ensure_headers(ws, EXERCISE_LOG_HEADERS)
     records = ws.get_all_records()
     if not records:
         return pd.DataFrame(columns=EXERCISE_LOG_HEADERS)
     df = pd.DataFrame(records)
-    mask = (df["email"] == _email) & (df["date"] >= start_date) & (df["date"] <= end_date)
+    mask = (df["email"] == email) & (df["date"] >= start_date) & (df["date"] <= end_date)
     result = df[mask].reset_index(drop=True)
     for c in ["duration_min", "met", "calories_burned"]:
         if c in result.columns:
@@ -479,13 +479,13 @@ def save_water(email: str, date: str, ml: int) -> None:
 
 
 @st.cache_data(ttl=300)
-def get_water_log(_email: str, date: str) -> int:
+def get_water_log(email: str, date: str) -> int:
     ws = _get_worksheet(WS_WATER_LOG)
     _ensure_headers(ws, WATER_LOG_HEADERS)
     records = ws.get_all_records()
     total = 0
     for r in records:
-        if r.get("email") == _email and r.get("date") == date:
+        if r.get("email") == email and r.get("date") == date:
             try:
                 total += int(r["ml"])
             except (ValueError, KeyError):
@@ -510,11 +510,11 @@ def reset_water(email: str, date: str) -> None:
 # ─── Favorites ───────────────────────────────────────────────
 
 @st.cache_data(ttl=300)
-def get_favorites(_email: str) -> list[dict]:
+def get_favorites(email: str) -> list[dict]:
     ws = _get_worksheet(WS_FAVORITES)
     _ensure_headers(ws, FAVORITES_HEADERS)
     records = ws.get_all_records()
-    favs = [r for r in records if r.get("email") == _email]
+    favs = [r for r in records if r.get("email") == email]
     favs.sort(key=lambda r: int(r.get("use_count", 0)), reverse=True)
     return favs
 
