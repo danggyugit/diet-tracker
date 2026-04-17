@@ -21,6 +21,7 @@ from services.gemini_service import analyze_food_image, estimate_multiple_foods
 from services.calorie_service import (
     calc_bmr, calc_tdee, calc_exercise_plan,
     calc_protein_g, calc_fat_g, calc_carbs_g,
+    evaluate_calorie_status,
 )
 from services.sheets_service import (
     get_profile, get_meals_for_date, save_meals, delete_meal_row, update_meal_row,
@@ -189,7 +190,15 @@ week_start = (selected_date - datetime.timedelta(days=7)).isoformat()
 w_totals = get_daily_totals(email, week_start, date_str)
 w_avg = float(w_totals["total_cal"].mean()) if not w_totals.empty else 0
 
-if remaining_cal > daily_budget * 0.3:
+# 4단계 평가 (너무 적음 / 적정 / 근접 / 초과)
+_eval_value = net_cal if exercise_comp_mode != "off" else eaten_cal
+_eval_label, _eval_color, _eval_level = evaluate_calorie_status(_eval_value, daily_budget)
+
+if _eval_level == "too_low":
+    bar_color = "#60A5FA"
+    fill_color = "#60A5FA"
+    hero_text = f"<b style='font-size:28px;'>{remaining_cal:,.0f}</b> kcal 남음 <span style='font-size:13px;'>🔵 너무 적음</span>"
+elif remaining_cal > daily_budget * 0.3:
     bar_color = "#22C55E"
     fill_color = "#22C55E"
     hero_text = f"남은 <b style='font-size:28px;'>{remaining_cal:,.0f}</b> kcal"
@@ -224,7 +233,7 @@ comp_html = " · ".join(comp_parts)
 
 st.markdown(
     f"<div style='background:rgba(30,41,59,0.5);"
-    f"border:1px solid {'#EF4444' if is_over else 'rgba(148,163,184,0.15)'};"
+    f"border:1px solid {'#EF4444' if is_over else ('#60A5FA' if _eval_level == 'too_low' else 'rgba(148,163,184,0.15)')};"
     f"border-radius:12px;padding:14px;margin:4px 0;'>"
     f"<div style='text-align:center;color:{bar_color};margin-bottom:8px;'>{hero_text}</div>"
     f"<div style='background:rgba(15,23,42,0.6);border-radius:6px;height:14px;position:relative;overflow:hidden;'>"
@@ -242,6 +251,8 @@ st.markdown(
 
 if daily_budget < 1200:
     st.caption(f"⚠️ 일일 목표({daily_budget:,})가 안전 권장량(1,200) 미만")
+if _eval_level == "too_low" and net_cal > 0:
+    st.caption(f"🔵 순칼로리 {net_cal:,.0f} kcal — 에너지 부족 위험. 더 드셔도 됩니다.")
 
 # ═══════════════════════════════════════════════════════════════
 # 영양소 (큰 도넛 + 세로 바)
