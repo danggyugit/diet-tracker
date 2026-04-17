@@ -149,12 +149,16 @@ today = today_kst()
 def _cell_color(cal_val: int) -> tuple[str, str]:
     if cal_val == 0:
         return "rgba(30,41,59,0.5)", "#64748B"
-    elif cal_val <= target:
-        return "rgba(34,197,94,0.4)", "#22C55E"
-    elif cal_val <= target * 1.1:
-        return "rgba(253,224,71,0.3)", "#FBBF24"
+    pct = cal_val / target * 100 if target > 0 else 0
+    # 4단계: 너무 적음 / 적정 / 근접 / 초과
+    if cal_val < 1200 or pct < 60:
+        return "rgba(96,165,250,0.3)", "#60A5FA"    # 🔵 너무 적음
+    elif pct <= 95:
+        return "rgba(34,197,94,0.4)", "#22C55E"     # ✅ 적정
+    elif pct <= 105:
+        return "rgba(253,224,71,0.3)", "#FBBF24"    # 🟡 근접
     else:
-        return "rgba(239,68,68,0.3)", "#EF4444"
+        return "rgba(239,68,68,0.3)", "#EF4444"     # 🔴 초과
 
 
 sel_date_state = st.session_state.get("cal_sel_date")
@@ -221,9 +225,9 @@ st.markdown(html, unsafe_allow_html=True)
 
 # 범례 - 가로 강제 배치
 st.markdown(
-    f"<div style='display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;"
+    f"<div style='display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:4px;"
     f"font-size:11px;color:#94A3B8;text-align:center;margin:8px 0 0;'>"
-    f"<div>🟢 목표 이하</div><div>🟡 소폭 초과</div><div>🔴 초과</div>"
+    f"<div>🔵 너무 적음</div><div>🟢 적정</div><div>🟡 근접</div><div>🔴 초과</div>"
     f"</div>"
     f"<div style='text-align:center;font-size:11px;color:#64748B;margin-top:2px;'>"
     f"목표 {target:,} kcal</div>",

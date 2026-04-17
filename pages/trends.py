@@ -20,7 +20,7 @@ from services.sheets_service import (
     get_profile, get_weight_log, get_latest_weight, get_streak,
     get_exercise_log,
 )
-from services.calorie_service import calc_bmr, calc_tdee, calc_protein_g
+from services.calorie_service import calc_bmr, calc_tdee, calc_protein_g, evaluate_calorie_status
 
 email = require_auth()
 st.title("📊 트렌드")
@@ -57,6 +57,16 @@ if not ex_period.empty:
 else:
     burn_by_date = {}
 
+# 운동 보정 모드 (off / avg7 / daily) — 평가 방식 결정
+_comp_raw = (profile.get("exercise_compensation") or "off").lower()
+if _comp_raw == "on":
+    _comp_raw = "avg7"
+if _comp_raw not in ("off", "avg7", "daily"):
+    _comp_raw = "off"
+exercise_comp_mode = _comp_raw
+# OFF면 gross intake로 평가, ON이면 net으로 평가
+use_net_for_eval = exercise_comp_mode != "off"
+
 # ═══════════════════════════════════════════════════════════════
 # 섹션 1: 한눈에 보기 (핵심 지표 + 평가)
 # ═══════════════════════════════════════════════════════════════
@@ -72,17 +82,15 @@ if totals.empty and weight_log.empty:
 # 지표 데이터 준비
 metric_data = []
 
-# 1. 평균 섭취
+# 1. 평균 섭취 (보정 모드에 따라 순/총 기반)
 if not totals.empty:
-    avg_cal = totals["total_cal"].mean()
-    achievement = (avg_cal / target * 100) if target > 0 else 0
-    if 90 <= achievement <= 105:
-        eval_text, eval_color = "✅ 적정", "#4ADE80"
-    elif achievement < 90:
-        eval_text, eval_color = "⬇️ 부족", "#FBBF24"
-    else:
-        eval_text, eval_color = "⚠️ 초과", "#FB7185"
-    metric_data.append(("평균 섭취", f"{avg_cal:,.0f} kcal", eval_text, eval_color))
+    avg_gross = totals["total_cal"].mean()
+    avg_burn = sum(burn_by_date.get(d, 0) for d in totals["date"]) / len(totals)
+    avg_net = avg_gross - avg_burn
+    eval_val = avg_net if use_net_for_eval else avg_gross
+    eval_label, eval_color, _ = evaluate_calorie_status(eval_val, target)
+    suffix = " (순)" if use_net_for_eval else ""
+    metric_data.append(("평균 섭취" + suffix, f"{eval_val:,.0f} kcal", eval_label, eval_color))
 else:
     metric_data.append(("평균 섭취", "기록 없음", "", "#64748B"))
 
@@ -148,13 +156,9 @@ st.markdown(cards_html, unsafe_allow_html=True)
 # ─── 종합 평가 한 줄 ──────────────────────────────────────────
 eval_lines = []
 if not totals.empty:
-    avg_cal = totals["total_cal"].mean()
-    if avg_cal <= target:
-        eval_lines.append("✅ 칼로리 유지")
-    elif avg_cal <= target * 1.1:
-        eval_lines.append("🟡 칼로리 근접")
-    else:
-        eval_lines.append("🔴 칼로리 초과")
+    _eval_val = avg_net if use_net_for_eval else avg_gross
+    _eval_label, _, _eval_level = evaluate_calorie_status(_eval_val, target)
+    eval_lines.append(f"{_eval_label} 칼로리")
 
 if not weight_log.empty and len(weight_log) >= 2:
     w_change = float(weight_log.iloc[-1]["weight"]) - float(weight_log.iloc[0]["weight"])
@@ -247,16 +251,94 @@ else:
     )
     st.plotly_chart(fig_weight, use_container_width=True)
 
-# ─── 칼로리 섭취 추이 (표 형식) ──────────────────────────────
-st.markdown("#### 🔥 일별 칼로리 섭취")
-st.caption(f"순칼로리(섭취-운동) 기준 평가 · 목표 {target:,} kcal")
+# ─── 에너지 균형 차트 (섭취 vs 소모 비교) ─────────────────────
+st.markdown("#### ⚡ 일별 에너지 균형")
+st.caption("섭취(주황)와 소모(파랑)의 차이를 한눈에 비교하세요.")
 
 if totals.empty:
     st.info("📝 식단 기록이 없습니다.")
 else:
+    bal_df = totals.copy()
+    bal_df["date_dt"] = pd.to_datetime(bal_df["date"])
+    weekday_names = ["월", "화", "수", "목", "금", "토", "일"]
+    bal_df["label"] = bal_df["date_dt"].apply(
+        lambda d: f"{d.month}/{d.day}({weekday_names[d.weekday()]})"
+    )
+    bal_df["burned"] = bal_df["date"].apply(lambda d: float(burn_by_date.get(d, 0)))
+    bal_df["tdee_base"] = tdee
+    bal_df["total_expend"] = bal_df["tdee_base"] + bal_df["burned"]
+    bal_df["deficit"] = bal_df["total_cal"] - bal_df["total_expend"]
+
+    fig_bal = go.Figure()
+    fig_bal.add_trace(go.Bar(
+        x=bal_df["label"], y=bal_df["total_cal"], name="섭취",
+        marker_color="#FBBF24", opacity=0.85,
+    ))
+    fig_bal.add_trace(go.Bar(
+        x=bal_df["label"], y=bal_df["total_expend"], name="소모 (TDEE+운동)",
+        marker_color="#3B82F6", opacity=0.65,
+    ))
+    fig_bal.add_hline(
+        y=target, line_dash="dot", line_color="#4ADE80",
+        annotation_text=f"목표 {target:,}", annotation_position="right",
+    )
+    fig_bal.update_layout(
+        **PLOT_CFG, height=280, barmode="group",
+        xaxis_title=None, yaxis_title="kcal",
+        margin=dict(l=40, r=15, t=30, b=30),
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="center", x=0.5),
+    )
+    st.plotly_chart(fig_bal, use_container_width=True)
+
+    # 누적 적자/흑자 차트
+    bal_df["cum_deficit"] = bal_df["deficit"].cumsum()
+    bal_df["cum_kg"] = bal_df["cum_deficit"] / 7700
+
+    fig_cum = go.Figure()
+    # 적자(음수) = 초록, 흑자(양수) = 빨강
+    colors = ["#4ADE80" if v <= 0 else "#FB7185" for v in bal_df["cum_deficit"]]
+    fig_cum.add_trace(go.Bar(
+        x=bal_df["label"], y=bal_df["cum_deficit"],
+        marker_color=colors, name="누적 칼로리",
+        hovertemplate="%{x}<br>누적 %{y:,.0f} kcal<br>≈ %{customdata:+.2f} kg<extra></extra>",
+        customdata=bal_df["cum_kg"],
+    ))
+    # 7,700 kcal 기준선 (1kg)
+    max_abs = max(abs(bal_df["cum_deficit"].max()), abs(bal_df["cum_deficit"].min()), 3850)
+    for kg_line in range(1, 4):
+        if kg_line * 7700 <= max_abs * 1.3:
+            fig_cum.add_hline(
+                y=-kg_line * 7700, line_dash="dot", line_color="rgba(74,222,128,0.3)",
+                annotation_text=f"-{kg_line}kg", annotation_position="left",
+            )
+    fig_cum.add_hline(y=0, line_color="rgba(148,163,184,0.4)")
+
+    fig_cum.update_layout(
+        **PLOT_CFG, height=240,
+        xaxis_title=None, yaxis_title="누적 kcal",
+        margin=dict(l=50, r=15, t=10, b=30),
+        showlegend=False,
+    )
+
+    cum_total = bal_df["cum_deficit"].iloc[-1] if len(bal_df) > 0 else 0
+    cum_kg = cum_total / 7700
+    cum_days = len(bal_df)
+    st.markdown(
+        f"<div style='text-align:center;font-size:13px;color:#94A3B8;margin:-6px 0 4px;'>"
+        f"📊 {cum_days}일 누적: <b style='color:{'#4ADE80' if cum_total <= 0 else '#FB7185'};'>"
+        f"{cum_total:+,.0f} kcal</b> ≈ <b>{cum_kg:+.2f} kg</b></div>",
+        unsafe_allow_html=True,
+    )
+    st.plotly_chart(fig_cum, use_container_width=True)
+
+# ─── 칼로리 섭취 추이 (표 형식, 5단계 평가) ──────────────────
+st.markdown("#### 🔥 일별 칼로리 상세")
+_eval_mode_label = "순칼로리" if use_net_for_eval else "섭취 칼로리"
+st.caption(f"{_eval_mode_label} 기준 평가 · 목표 {target:,} kcal")
+
+if not totals.empty:
     totals_display = totals.copy()
     totals_display["date_dt"] = pd.to_datetime(totals_display["date"])
-    weekday_names = ["월", "화", "수", "목", "금", "토", "일"]
     totals_display["날짜"] = totals_display["date_dt"].apply(
         lambda d: f"{d.month}/{d.day} ({weekday_names[d.weekday()]})"
     )
@@ -265,28 +347,40 @@ else:
     )
     totals_display["net"] = totals_display["total_cal"] - totals_display["burned"]
 
+    # 보정 모드에 따라 평가 대상 결정
+    eval_col = "net" if use_net_for_eval else "total_cal"
+
     totals_display["섭취"] = totals_display["total_cal"].apply(lambda c: f"{c:,.0f}")
     totals_display["운동"] = totals_display["burned"].apply(
         lambda c: f"-{c:,.0f}" if c > 0 else "—"
     )
     totals_display["순칼로리"] = totals_display["net"].apply(lambda c: f"{c:,.0f}")
-    totals_display["차이"] = totals_display["net"].apply(
+    totals_display["차이"] = totals_display[eval_col].apply(
         lambda c: f"{int(c - target):+,}"
     )
-    totals_display["평가"] = totals_display["net"].apply(
-        lambda c: "🔴 초과" if c > target * 1.05 else ("🟡 근접" if c > target else "✅ 이하")
+    totals_display["평가"] = totals_display[eval_col].apply(
+        lambda c: evaluate_calorie_status(c, target)[0]
     )
-    display_df = totals_display[["날짜", "섭취", "운동", "순칼로리", "차이", "평가"]].sort_values("날짜", ascending=False)
+
+    if use_net_for_eval:
+        cols = ["날짜", "섭취", "운동", "순칼로리", "차이", "평가"]
+    else:
+        cols = ["날짜", "섭취", "차이", "평가"]
+    display_df = totals_display[cols].sort_values("날짜", ascending=False)
     st.dataframe(display_df, use_container_width=True, hide_index=True, height=min(len(display_df) * 36 + 38, 400))
 
-    # 인사이트 문장 (순칼로리 기준)
-    over_days = int((totals_display["net"] > target).sum())
-    under_days = int((totals_display["net"] <= target).sum())
+    # 인사이트 (4단계 기반)
+    eval_results = totals_display[eval_col].apply(lambda c: evaluate_calorie_status(c, target)[2])
+    n_over = int((eval_results == "over").sum())
+    n_too_low = int((eval_results == "too_low").sum())
     total_days = len(totals_display)
-    if over_days > total_days * 0.5:
-        st.warning(f"⚠️ {total_days}일 중 {over_days}일 순칼로리 목표 초과 — 식단 조절이 필요합니다.")
-    elif under_days > total_days * 0.7:
-        st.success(f"✅ {total_days}일 중 {under_days}일 순칼로리 목표 이하 — 순항 중!")
+
+    if n_too_low > 0:
+        st.warning(f"⚠️ {total_days}일 중 {n_too_low}일 칼로리 너무 적음 — 에너지 가용성 부족 위험 (근손실·호르몬 저하)")
+    if n_over > total_days * 0.5:
+        st.warning(f"⚠️ {total_days}일 중 {n_over}일 목표 초과 — 식단 조절이 필요합니다.")
+    elif n_over == 0 and n_too_low == 0:
+        st.success(f"✅ {total_days}일 모두 적정 범위 — 순항 중!")
 
 # ═══════════════════════════════════════════════════════════════
 # 섹션 3: 패턴 발견

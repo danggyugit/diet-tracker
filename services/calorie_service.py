@@ -55,6 +55,29 @@ def calc_carbs_g(daily_target: int, protein_g: int, fat_g: int) -> int:
     return max(round((daily_target - protein_g * 4 - fat_g * 9) / 4), 50)
 
 
+def evaluate_calorie_status(value: float, target: float) -> tuple[str, str, str]:
+    """칼로리 평가 — 4단계 (너무 적음 / 적정 / 근접 / 초과).
+
+    Args:
+        value: 평가할 칼로리 (gross 또는 net)
+        target: 일일 목표 칼로리
+
+    Returns:
+        (label, color_hex, level) — level은 too_low/ok/near/over
+    """
+    if target <= 0:
+        return ("—", "#94A3B8", "none")
+    pct = value / target * 100
+    # 절대 안전 하한: 1,200 kcal (성인 권장)
+    if value < 1200 or pct < 60:
+        return ("🔵 너무 적음", "#60A5FA", "too_low")
+    if pct <= 95:
+        return ("✅ 적정", "#4ADE80", "ok")
+    if pct <= 105:
+        return ("🟡 근접", "#FBBF24", "near")
+    return ("🔴 초과", "#FB7185", "over")
+
+
 def calc_daily_deficit(
     current_weight: float,
     target_weight: float,
