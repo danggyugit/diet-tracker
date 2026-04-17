@@ -216,15 +216,19 @@ else:
     fill_color = "#FBBF24"
     hero_text = f"<b style='font-size:28px;'>{abs(remaining_cal):,.0f}</b> kcal 초과"
 
-is_over = net_cal > daily_budget
-_cal_max = net_cal * 1.02 if is_over else daily_budget * 1.08
+# 바 위치·is_over 모두 _eval_value 기준으로 통일
+is_over = _eval_value > daily_budget
+_cal_max = _eval_value * 1.02 if is_over else daily_budget * 1.08
 _cal_max = max(_cal_max, 1)
 cal_goal_pos = daily_budget / _cal_max * 100
-cal_fill_pos = min(net_cal, daily_budget) / _cal_max * 100
-cal_over_pos = max(net_cal - daily_budget, 0) / _cal_max * 100
+cal_fill_pos = min(_eval_value, daily_budget) / _cal_max * 100
+cal_over_pos = max(_eval_value - daily_budget, 0) / _cal_max * 100
 
+# 하단 비교 텍스트
 comp_parts = []
-if burned_cal > 0:
+if exercise_comp_mode != "off" and burned_cal > 0:
+    comp_parts.append(f"섭취 {eaten_cal:,.0f} · 운동 보정 +{int(exercise_boost):,}")
+elif burned_cal > 0:
     comp_parts.append(f"섭취 {eaten_cal:,.0f} − 운동 {burned_cal:,.0f}")
 if y_cal > 0:
     diff = eaten_cal - y_cal
@@ -235,6 +239,12 @@ if w_avg > 0:
     arrow, clr = ("↑", "#FB7185") if diff > 0 else ("↓", "#4ADE80")
     comp_parts.append(f"주평균 <span style='color:{clr};'>{arrow}{abs(diff):,.0f}</span>")
 comp_html = " · ".join(comp_parts)
+
+# 바 하단 라벨: 보정 ON이면 섭취 기준 표시, OFF면 순 기준
+if exercise_comp_mode != "off":
+    left_label = f"섭취 {eaten_cal:,.0f} kcal"
+else:
+    left_label = f"순 {net_cal:,.0f} kcal"
 
 st.markdown(
     f"<div style='background:rgba(30,41,59,0.5);"
@@ -247,7 +257,7 @@ st.markdown(
     f"<div style='position:absolute;left:{cal_goal_pos:.1f}%;top:0;width:2px;height:100%;background:#F8FAFC;z-index:1;'></div>"
     f"</div>"
     f"<div style='display:flex;justify-content:space-between;font-size:11px;color:#94A3B8;margin-top:6px;'>"
-    f"<span>순 {net_cal:,.0f} kcal</span>"
+    f"<span>{left_label}</span>"
     f"<span>{'⚠️ ' if is_over else ''}목표 {daily_budget:,} kcal</span></div>"
     f"{'<div style=\"text-align:center;font-size:11px;color:#94A3B8;margin-top:4px;\">' + comp_html + '</div>' if comp_html else ''}"
     f"</div>",
