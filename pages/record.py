@@ -32,6 +32,7 @@ from services.sheets_service import (
     delete_exercise_row, update_exercise_row,
     save_water, get_water_log, reset_water,
     get_favorites, get_recent_foods, get_yesterday_meals, get_streak,
+    lookup_food_nutrition,
 )
 
 email = require_auth()
@@ -494,15 +495,33 @@ with tab_meal:
 
         food_lines = [l.strip() for l in manual_text.strip().split("\n") if l.strip()] if manual_text.strip() else []
         if food_lines:
-            with st.spinner(f"🔍 {len(food_lines)}개 음식 AI 추정 중..."):
-                try:
-                    estimated = estimate_multiple_foods(food_lines)
-                    for f in estimated:
-                        f["source"] = "manual"
-                    pending.extend(estimated)
-                except Exception as e:
-                    st.error(f"추정 실패: {e}")
-                    has_error = True
+            # 1단계: 로컬 기록 조회 (즐겨찾기 + 최근 30일) — Gemini 호출 없음
+            local_hits = []
+            needs_ai = []
+            for line in food_lines:
+                # "반인분", "2인분" 등 수량 표현 제거하고 음식명만 추출
+                bare_name = line.split(" ")[0] if " " in line else line
+                found = lookup_food_nutrition(email, bare_name)
+                if found:
+                    local_hits.append(found)
+                else:
+                    needs_ai.append(line)
+
+            if local_hits:
+                pending.extend(local_hits)
+                st.info(f"✅ {len(local_hits)}개 음식을 기존 기록에서 가져왔습니다 (AI 호출 생략)")
+
+            # 2단계: 로컬에 없는 음식만 Gemini 호출
+            if needs_ai:
+                with st.spinner(f"🔍 {len(needs_ai)}개 음식 AI 추정 중..."):
+                    try:
+                        estimated = estimate_multiple_foods(needs_ai)
+                        for f in estimated:
+                            f["source"] = "manual"
+                        pending.extend(estimated)
+                    except Exception as e:
+                        st.error(f"추정 실패: {e}")
+                        has_error = True
 
         if selected_favs:
             for sel_name in selected_favs:

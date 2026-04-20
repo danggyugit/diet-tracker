@@ -610,6 +610,52 @@ def update_favorite(email: str, food_name: str, data: dict) -> bool:
     return False
 
 
+def lookup_food_nutrition(email: str, food_name: str) -> dict | None:
+    """로컬 기록에서 음식 영양 정보 조회 (Gemini 호출 회피).
+
+    우선순위: 즐겨찾기 → 최근 30일 식사 기록 → None
+    이름은 대소문자/공백 제거 후 완전 일치로 검색.
+    """
+    key = food_name.strip().lower()
+    if not key:
+        return None
+
+    # 1. 즐겨찾기
+    for f in get_favorites(email):
+        if f.get("food_name", "").strip().lower() == key:
+            return {
+                "name": f.get("food_name", ""),
+                "amount": f.get("amount", ""),
+                "calories": int(f.get("calories", 0) or 0),
+                "carbs": int(f.get("carbs", 0) or 0),
+                "protein": int(f.get("protein", 0) or 0),
+                "fat": int(f.get("fat", 0) or 0),
+                "quantity": 1.0,
+                "source": "favorite",
+            }
+
+    # 2. 최근 30일 식사 기록 (최신 우선)
+    end = datetime.now().strftime("%Y-%m-%d")
+    start = (datetime.now() - timedelta(days=30)).strftime("%Y-%m-%d")
+    meals = get_meals(email, start, end)
+    if meals.empty:
+        return None
+    match = meals[meals["food_name"].str.strip().str.lower() == key]
+    if match.empty:
+        return None
+    latest = match.sort_values("created_at", ascending=False).iloc[0]
+    return {
+        "name": latest.get("food_name", ""),
+        "amount": latest.get("amount", ""),
+        "calories": int(float(latest.get("calories", 0) or 0)),
+        "carbs": int(float(latest.get("carbs", 0) or 0)),
+        "protein": int(float(latest.get("protein", 0) or 0)),
+        "fat": int(float(latest.get("fat", 0) or 0)),
+        "quantity": 1.0,
+        "source": "recent",
+    }
+
+
 def auto_add_favorites_from_meals(email: str) -> None:
     """최근 식사 기록에서 3회 이상 먹은 음식을 자동으로 즐겨찾기에 추가."""
     top = get_top_foods(email, days=60)
