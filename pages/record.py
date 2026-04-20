@@ -726,16 +726,26 @@ else:
             is_editing = st.session_state.editing_key == row_key
 
             if is_editing:
+                # 빠른 인분 버튼은 form 밖에서 (즉시 session_state 반영)
+                qty_key = f"edit_qty_{row_key}"
+                if qty_key not in st.session_state:
+                    st.session_state[qty_key] = float(row["quantity"])
+
+                st.markdown(f"**{row['food_name']}** 수정")
+                st.caption("빠른 인분 선택 (아래 폼에 즉시 반영):")
+                qc = st.columns(4)
+                for i, q in enumerate([0.5, 1.0, 1.5, 2.0]):
+                    if qc[i].button(f"{q}인분", key=f"qq_{row_key}_{q}", use_container_width=True):
+                        st.session_state[qty_key] = q
+                        st.rerun()
+
                 with st.form(f"edit_form_{row_key}"):
-                    st.markdown(f"**{row['food_name']}** 수정")
                     ec1, ec2 = st.columns(2)
                     edit_cal = ec1.number_input("칼로리 (kcal)", value=int(row["calories"]), min_value=0)
-                    edit_qty = ec2.number_input("인분", value=float(row["quantity"]), min_value=0.25, max_value=10.0, step=0.25)
-                    st.caption("빠른 인분 선택:")
-                    qc = st.columns(4)
-                    for i, q in enumerate([0.25, 0.5, 1.0, 1.5]):
-                        if qc[i].form_submit_button(f"{q}인분", use_container_width=True):
-                            edit_qty = q
+                    edit_qty = ec2.number_input(
+                        "인분", value=st.session_state[qty_key],
+                        min_value=0.25, max_value=10.0, step=0.25,
+                    )
                     ec3, ec4, ec5 = st.columns(3)
                     edit_carbs = ec3.number_input("탄(g)", value=int(row.get("carbs", 0)), min_value=0)
                     edit_protein = ec4.number_input("단(g)", value=int(row.get("protein", 0)), min_value=0)
@@ -747,10 +757,12 @@ else:
                             edit_cal, edit_qty, edit_carbs, edit_protein, edit_fat,
                         )
                         st.session_state.editing_key = None
+                        st.session_state.pop(qty_key, None)
                         st.toast("✅ 수정됨", icon="✏️")
                         st.rerun()
                     if bc2.form_submit_button("취소", use_container_width=True):
                         st.session_state.editing_key = None
+                        st.session_state.pop(qty_key, None)
                         st.rerun()
             else:
                 # 시간 표시 (created_at에서 HH:MM 추출)
