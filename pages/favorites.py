@@ -25,8 +25,11 @@ with ac1:
     add_open = st.toggle("➕ 새 음식 추가", key="fav_add_toggle")
 with ac2:
     if st.button("📥 식사 기록에서 채우기", use_container_width=True):
-        count = auto_add_favorites_from_meals(email)
-        st.toast("✅ 자동 채우기 완료!", icon="📥")
+        added = auto_add_favorites_from_meals(email)
+        if added:
+            st.toast(f"✅ {len(added)}개 자동 등록!", icon="📥")
+        else:
+            st.toast("추가할 음식이 없습니다 (5회 이상 필요)", icon="ℹ️")
         st.rerun()
 
 if add_open:

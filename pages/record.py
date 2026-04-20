@@ -32,7 +32,7 @@ from services.sheets_service import (
     delete_exercise_row, update_exercise_row,
     save_water, get_water_log, reset_water,
     get_favorites, get_recent_foods, get_yesterday_meals, get_streak,
-    lookup_food_nutrition,
+    lookup_food_nutrition, auto_add_favorites_from_meals,
 )
 
 email = require_auth()
@@ -542,6 +542,11 @@ with tab_meal:
             save_meals(email, date_str, meal_type, pending)
             total = sum(f.get("calories", 0) * f.get("quantity", 1) for f in pending)
             st.toast(f"✅ {meal_type} {len(pending)}개 ({total:,.0f}kcal) 저장!", icon="🍽️")
+
+            # 자주 먹는 음식(5회 이상) 자동 즐겨찾기 등록
+            auto_added = auto_add_favorites_from_meals(email)
+            for fname in auto_added:
+                st.toast(f"⭐ {fname} 자주 드셔서 즐겨찾기에 자동 등록!", icon="⭐")
 
             # 목표 달성 축하 토스트
             new_eaten = eaten_cal + total

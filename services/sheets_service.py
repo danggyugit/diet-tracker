@@ -656,23 +656,31 @@ def lookup_food_nutrition(email: str, food_name: str) -> dict | None:
     }
 
 
-def auto_add_favorites_from_meals(email: str) -> None:
-    """최근 식사 기록에서 3회 이상 먹은 음식을 자동으로 즐겨찾기에 추가."""
-    top = get_top_foods(email, days=60)
-    if top.empty:
-        return
+def auto_add_favorites_from_meals(email: str, threshold: int = 5, window_days: int = 60) -> list[str]:
+    """최근 N일 식사 기록에서 threshold회 이상 먹은 음식을 즐겨찾기 자동 등록.
+
+    Returns: 새로 추가된 음식 이름 목록 (UI 토스트용)
+    """
+    end = datetime.now().strftime("%Y-%m-%d")
+    start = (datetime.now() - timedelta(days=window_days)).strftime("%Y-%m-%d")
+    meals_df = get_meals(email, start, end)
+    if meals_df.empty:
+        return []
+
     existing = {f["food_name"] for f in get_favorites(email)}
-    meals_df = get_meals(email,
-                         (datetime.now() - timedelta(days=60)).strftime("%Y-%m-%d"),
-                         datetime.now().strftime("%Y-%m-%d"))
-    for _, row in top.iterrows():
-        if row["count"] >= 3 and row["food_name"] not in existing:
-            food_row = meals_df[meals_df["food_name"] == row["food_name"]].iloc[0]
+    counts = meals_df.groupby("food_name").size()
+
+    added = []
+    for food_name, count in counts.items():
+        if count >= threshold and food_name not in existing:
+            food_row = meals_df[meals_df["food_name"] == food_name].iloc[0]
             add_favorite(email, {
                 "name": food_row.get("food_name", ""),
                 "amount": food_row.get("amount", ""),
-                "calories": int(food_row.get("calories", 0)),
-                "carbs": int(food_row.get("carbs", 0)),
-                "protein": int(food_row.get("protein", 0)),
-                "fat": int(food_row.get("fat", 0)),
+                "calories": int(float(food_row.get("calories", 0) or 0)),
+                "carbs": int(float(food_row.get("carbs", 0) or 0)),
+                "protein": int(float(food_row.get("protein", 0) or 0)),
+                "fat": int(float(food_row.get("fat", 0) or 0)),
             })
+            added.append(food_name)
+    return added
