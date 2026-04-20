@@ -73,4 +73,29 @@ if is_logged_in():
     nav_html += "</div>"
     st.markdown(nav_html, unsafe_allow_html=True)
 
-pg.run()
+try:
+    pg.run()
+except Exception as e:
+    import gspread
+    err_type = type(e).__name__
+    if isinstance(e, gspread.exceptions.APIError):
+        code = getattr(e.response, "status_code", 0) if hasattr(e, "response") else 0
+        if code == 429:
+            st.error(
+                "⚠️ 요청이 몰려 일시적으로 응답이 느립니다.\n\n"
+                "10-20초 후 새로고침해 주세요. 같은 문제가 지속되면 1분 정도 기다려 주세요."
+            )
+        elif code in (500, 502, 503):
+            st.error(
+                "⚠️ Google 서비스 일시 장애입니다.\n\n"
+                "잠시 후 새로고침해 주세요."
+            )
+        else:
+            st.error(
+                "⚠️ 데이터 접근 중 오류가 발생했습니다.\n\n"
+                "새로고침 후 문제가 지속되면 로그아웃 후 재로그인해 주세요."
+            )
+    else:
+        st.error(f"⚠️ 예기치 않은 오류 ({err_type})\n\n새로고침해 주세요.")
+    if st.button("🔄 새로고침"):
+        st.rerun()

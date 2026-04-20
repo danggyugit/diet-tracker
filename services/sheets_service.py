@@ -1,5 +1,6 @@
 """Google Sheets CRUD 서비스 (gspread + Service Account)."""
 
+import time
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
@@ -14,6 +15,17 @@ from config import (
     MEALS_HEADERS, PROFILES_HEADERS, MEMOS_HEADERS, WEIGHT_LOG_HEADERS,
     EXERCISE_LOG_HEADERS, WATER_LOG_HEADERS, FAVORITES_HEADERS,
 )
+
+# 워크시트별 헤더 매핑 (_get_worksheet에서 한 번만 체크)
+_WS_HEADERS_MAP = {
+    WS_PROFILES: PROFILES_HEADERS,
+    WS_MEALS: MEALS_HEADERS,
+    WS_MEMOS: MEMOS_HEADERS,
+    WS_WEIGHT_LOG: WEIGHT_LOG_HEADERS,
+    WS_EXERCISE_LOG: EXERCISE_LOG_HEADERS,
+    WS_WATER_LOG: WATER_LOG_HEADERS,
+    WS_FAVORITES: FAVORITES_HEADERS,
+}
 
 KST = ZoneInfo("Asia/Seoul")
 
@@ -53,20 +65,45 @@ def _get_spreadsheet() -> gspread.Spreadsheet:
 
 @st.cache_resource
 def _get_worksheet(name: str) -> gspread.Worksheet:
+    """워크시트 핸들 반환 + 헤더 1회 보장 (프로세스 수명 동안 캐싱)."""
     ss = _get_spreadsheet()
     try:
-        return ss.worksheet(name)
+        ws = ss.worksheet(name)
     except gspread.WorksheetNotFound:
-        return ss.add_worksheet(title=name, rows=1000, cols=20)
+        ws = ss.add_worksheet(title=name, rows=1000, cols=20)
+
+    # 헤더 1회 보장 — @st.cache_resource로 전체 프로세스에서 한 번만 실행됨
+    headers = _WS_HEADERS_MAP.get(name)
+    if headers:
+        try:
+            first_row = ws.row_values(1)
+            if not first_row:
+                ws.append_row(headers)
+            elif len(first_row) != len(headers) or first_row != headers:
+                ws.update(f"A1:{chr(64 + len(headers))}1", [headers])
+        except gspread.exceptions.APIError:
+            # 헤더 체크 실패 시에도 워크시트는 반환 (후속 호출에서 재시도)
+            pass
+    return ws
 
 
 def _ensure_headers(ws: gspread.Worksheet, headers: list[str]) -> None:
-    """워크시트 헤더행이 비어있거나 열 수가 다르면 갱신."""
-    first_row = ws.row_values(1)
-    if not first_row:
-        ws.append_row(headers)
-    elif len(first_row) != len(headers) or first_row != headers:
-        ws.update(f"A1:{chr(64 + len(headers))}1", [headers])
+    """하위 호환용 no-op — 헤더는 _get_worksheet에서 1회 보장됨."""
+    pass
+
+
+def _with_retry(fn, *args, max_retries: int = 3, **kwargs):
+    """gspread API 호출 래퍼 — 429/500/503에 지수 백오프 재시도."""
+    for attempt in range(max_retries):
+        try:
+            return fn(*args, **kwargs)
+        except gspread.exceptions.APIError as e:
+            code = getattr(e.response, "status_code", None) if hasattr(e, "response") else None
+            # 재시도 가능한 에러만
+            if code in (429, 500, 502, 503) and attempt < max_retries - 1:
+                time.sleep(1.5 ** attempt)  # 1, 1.5, 2.25초
+                continue
+            raise
 
 
 # ─── Profiles ────────────────────────────────────────────────
@@ -199,25 +236,23 @@ def delete_meals_by_type(email: str, date: str, meal_type: str) -> int:
 def update_meal_row(email: str, date: str, food_name: str, created_at: str,
                     new_calories: int, new_quantity: float,
                     new_carbs: int = None, new_protein: int = None, new_fat: int = None) -> bool:
-    """저장된 식사 기록의 칼로리/수량/영양소 수정."""
+    """저장된 식사 기록의 칼로리/수량/영양소 수정 (1회 API 호출로 배치)."""
     ws = _get_worksheet(WS_MEALS)
-    _ensure_headers(ws, MEALS_HEADERS)
     records = ws.get_all_records()
     for i, r in enumerate(records):
         if (r.get("email") == email and r.get("date") == date
                 and r.get("food_name") == food_name
                 and str(r.get("created_at", "")) == str(created_at)):
             row_num = i + 2
-            # calories=F, carbs=G, protein=H, fat=I, quantity=J, total_cal=K
-            ws.update(f"F{row_num}", [[new_calories]])
-            if new_carbs is not None:
-                ws.update(f"G{row_num}", [[new_carbs]])
-            if new_protein is not None:
-                ws.update(f"H{row_num}", [[new_protein]])
-            if new_fat is not None:
-                ws.update(f"I{row_num}", [[new_fat]])
-            ws.update(f"J{row_num}", [[new_quantity]])
-            ws.update(f"K{row_num}", [[round(new_calories * new_quantity)]])
+            # 모든 영양 필드 F~K를 1회 업데이트로 배치 (API 호출 6회 → 1회)
+            carbs_val = new_carbs if new_carbs is not None else r.get("carbs", 0)
+            protein_val = new_protein if new_protein is not None else r.get("protein", 0)
+            fat_val = new_fat if new_fat is not None else r.get("fat", 0)
+            ws.update(
+                f"F{row_num}:K{row_num}",
+                [[new_calories, carbs_val, protein_val, fat_val,
+                  new_quantity, round(new_calories * new_quantity)]],
+            )
             get_meals.clear()
             return True
     return False
