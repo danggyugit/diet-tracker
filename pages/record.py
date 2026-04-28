@@ -14,7 +14,11 @@ import streamlit as st
 
 from config import MEAL_TYPES, MAX_FILE_SIZE, PLOT_CFG, today_kst
 from services.auth_service import require_auth
-from services.gemini_service import analyze_food_image, estimate_multiple_foods
+from services.gemini_service import (
+    analyze_food_image, estimate_multiple_foods,
+    FoodAnalysisError, RecognitionError, RateLimitError,
+    ServerOverloadError, InvalidResponseError, ConfigError,
+)
 from services.calorie_service import (
     calc_bmr, calc_tdee, calc_exercise_plan,
     calc_protein_g, calc_fat_g, calc_carbs_g,
@@ -442,7 +446,7 @@ if meal_submitted:
 
     for uploaded in uploaded_files or []:
         if uploaded.size > MAX_FILE_SIZE:
-            st.error(f"{uploaded.name}: 10MB 초과")
+            st.error(f"📦 **{uploaded.name}** — 파일 크기 초과 (10MB 이상)\n\n작은 사진으로 다시 업로드해 주세요.")
             has_error = True
             continue
         st.image(uploaded, width=180)
@@ -451,12 +455,37 @@ if meal_submitted:
         with st.spinner(f"🔍 {uploaded.name} AI 분석 중... (5~15초 소요)"):
             try:
                 result = analyze_food_image(uploaded.getvalue(), media_map.get(ext, "image/jpeg"))
-                if result and not result.get("error") and result.get("foods"):
-                    for f in result["foods"]:
-                        f["source"] = "ai"
-                    pending.extend(result["foods"])
+                for f in result["foods"]:
+                    f["source"] = "ai"
+                pending.extend(result["foods"])
+            except RecognitionError as e:
+                st.warning(
+                    f"{e.icon} **{uploaded.name}** — {e.title}\n\n{e.suggestion}"
+                )
+                has_error = True
+            except RateLimitError as e:
+                st.error(f"{e.icon} **{e.title}**\n\n{e.suggestion}")
+                has_error = True
+            except ServerOverloadError as e:
+                st.error(f"{e.icon} **{e.title}**\n\n{e.suggestion}")
+                has_error = True
+            except InvalidResponseError as e:
+                st.warning(f"{e.icon} **{uploaded.name}** — {e.title}\n\n{e.suggestion}")
+                has_error = True
+            except ConfigError as e:
+                st.error(f"{e.icon} **{e.title}**\n\n{e.suggestion}")
+                has_error = True
+            except FoodAnalysisError as e:
+                st.error(
+                    f"{e.icon} **{uploaded.name}** — {e.title}\n\n"
+                    f"{e.suggestion}\n\n상세: `{str(e)[:120]}`"
+                )
+                has_error = True
             except Exception as e:
-                st.error(f"분석 오류: {e}")
+                st.error(
+                    f"⚠️ **{uploaded.name}** — 예기치 않은 오류\n\n"
+                    f"새로고침 후 다시 시도해 주세요.\n\n상세: `{type(e).__name__}: {str(e)[:120]}`"
+                )
                 has_error = True
 
     food_lines = [l.strip() for l in manual_text.strip().split("\n") if l.strip()] if manual_text.strip() else []
@@ -480,8 +509,23 @@ if meal_submitted:
                     for f in estimated:
                         f["source"] = "manual"
                     pending.extend(estimated)
+                except RateLimitError as e:
+                    st.error(f"{e.icon} **{e.title}**\n\n{e.suggestion}")
+                    has_error = True
+                except ServerOverloadError as e:
+                    st.error(f"{e.icon} **{e.title}**\n\n{e.suggestion}")
+                    has_error = True
+                except InvalidResponseError as e:
+                    st.warning(f"{e.icon} **{e.title}**\n\n{e.suggestion}")
+                    has_error = True
+                except ConfigError as e:
+                    st.error(f"{e.icon} **{e.title}**\n\n{e.suggestion}")
+                    has_error = True
+                except FoodAnalysisError as e:
+                    st.error(f"{e.icon} **{e.title}**\n\n{e.suggestion}\n\n상세: `{str(e)[:120]}`")
+                    has_error = True
                 except Exception as e:
-                    st.error(f"추정 실패: {e}")
+                    st.error(f"⚠️ AI 추정 중 예기치 않은 오류 — 다시 시도해 주세요.\n\n`{type(e).__name__}: {str(e)[:120]}`")
                     has_error = True
 
     if selected_favs:

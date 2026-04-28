@@ -15,6 +15,62 @@ from google.genai import types
 
 GEMINI_MODEL = "gemini-2.5-flash"
 
+
+# ─── 분류된 분석 에러 (사용자 친화 메시지) ────────────────────
+class FoodAnalysisError(Exception):
+    """음식 분석 실패 기본 클래스 — UI에서 카테고리별 안내 표시용."""
+    category = "unknown"
+    icon = "⚠️"
+    title = "분석 중 오류"
+    suggestion = "잠시 후 다시 시도해 주세요."
+
+
+class RecognitionError(FoodAnalysisError):
+    """AI가 사진에서 음식을 인식하지 못함 — 사진 품질·구도 문제."""
+    category = "recognition"
+    icon = "🍽️"
+    title = "음식을 인식할 수 없습니다"
+    suggestion = (
+        "조명이 밝은 곳에서 음식이 잘 보이도록 다시 촬영해 보세요.\n"
+        "여러 음식이 겹쳐 있다면 개별 촬영이 더 정확합니다.\n"
+        "또는 '✏️ 수동' 입력으로 음식 이름을 직접 적어 주세요."
+    )
+
+
+class RateLimitError(FoodAnalysisError):
+    """API 분당/일별 호출 한도 초과 (429)."""
+    category = "rate_limit"
+    icon = "🚦"
+    title = "AI 요청 한도 초과"
+    suggestion = (
+        "1~2분 후 다시 시도해 주세요.\n"
+        "동일한 음식이라면 '✏️ 수동' 입력 시 즐겨찾기·최근 기록에서 자동으로 가져와 한도를 절약합니다."
+    )
+
+
+class ServerOverloadError(FoodAnalysisError):
+    """Gemini 서버 일시 과부하 (503)."""
+    category = "server"
+    icon = "🛠️"
+    title = "AI 서버 일시 장애"
+    suggestion = "Google Gemini 서버가 잠시 응답이 없습니다. 1~2분 후 다시 시도해 주세요."
+
+
+class InvalidResponseError(FoodAnalysisError):
+    """AI 응답을 파싱할 수 없음 — 형식이 깨졌거나 비어있음."""
+    category = "parse"
+    icon = "📭"
+    title = "AI 응답을 처리할 수 없습니다"
+    suggestion = "다시 시도해 주세요. 반복되면 '✏️ 수동' 입력을 사용해 주세요."
+
+
+class ConfigError(FoodAnalysisError):
+    """API 키 등 설정 문제."""
+    category = "config"
+    icon = "🔧"
+    title = "서비스 설정 오류"
+    suggestion = "관리자에게 문의해 주세요. (GEMINI_API_KEY 확인 필요)"
+
 IMAGE_PROMPT = """다음 음식 사진을 분석하여 JSON만 반환하세요. 다른 텍스트는 절대 포함하지 마세요.
 혼합 음식(예: 김밥, 비빔밥)은 하나의 항목으로 처리하세요.
 음식의 양은 한국 일반 1인분 기준(Standard serving size)으로 추정하세요.
@@ -51,43 +107,64 @@ carbs(탄수화물), protein(단백질), fat(지방)은 그램(g) 단위 정수�
 def _get_client() -> genai.Client:
     api_key = st.secrets.get("GEMINI_API_KEY")
     if not api_key:
-        raise EnvironmentError("GEMINI_API_KEY가 secrets.toml에 설정되지 않았습니다")
+        raise ConfigError()
     return genai.Client(api_key=api_key)
 
 
 def _call_api(func):
-    """API 호출 래퍼. 503 서버 과부하는 자동 재시도, 429는 친절한 메시지."""
+    """API 호출 래퍼 — 503 자동 재시도, 그 외 에러는 분류된 예외로 변환."""
     for attempt in range(3):
         try:
             return func()
+        except FoodAnalysisError:
+            raise
         except Exception as e:
             err_str = str(e)
-            if "503" in err_str or "UNAVAILABLE" in err_str:
+            err_lower = err_str.lower()
+            if "503" in err_str or "unavailable" in err_lower or "overloaded" in err_lower:
                 if attempt < 2:
                     time.sleep(3 * (attempt + 1))
                     continue
-                raise RuntimeError("AI 서버 과부하로 응답이 없습니다. 1~2분 후 다시 시도해 주세요.") from e
-            if "429" in err_str or "rate_limit" in err_str.lower():
-                raise RuntimeError("AI 요청 한도 초과. 잠시 후(1~2분) 다시 시도해 주세요.") from e
-            raise
+                raise ServerOverloadError() from e
+            if "429" in err_str or "rate_limit" in err_lower or "quota" in err_lower:
+                raise RateLimitError() from e
+            if "401" in err_str or "403" in err_str or "api_key" in err_lower or "permission" in err_lower:
+                raise ConfigError() from e
+            # 기타 예기치 않은 에러 — 원본 메시지 보존
+            raise FoodAnalysisError(err_str) from e
 
 
 def _parse_json(raw_text: str) -> dict:
     match = re.search(r"\{.*\}", raw_text, re.DOTALL)
     if not match:
-        raise ValueError("응답에서 JSON을 찾을 수 없습니다")
-    return json.loads(match.group())
+        raise InvalidResponseError("응답에서 JSON을 찾을 수 없습니다")
+    try:
+        return json.loads(match.group())
+    except json.JSONDecodeError as e:
+        raise InvalidResponseError(f"JSON 파싱 실패: {e}") from e
 
 
 def _parse_json_array(raw_text: str) -> list[dict]:
     match = re.search(r"\[.*\]", raw_text, re.DOTALL)
     if not match:
-        raise ValueError("응답에서 JSON 배열을 찾을 수 없습니다")
-    return json.loads(match.group())
+        raise InvalidResponseError("응답에서 JSON 배열을 찾을 수 없습니다")
+    try:
+        return json.loads(match.group())
+    except json.JSONDecodeError as e:
+        raise InvalidResponseError(f"JSON 파싱 실패: {e}") from e
 
 
 def analyze_food_image(image_bytes: bytes, media_type: str = "image/jpeg") -> dict:
-    """Gemini Vision API로 음식 사진 분석."""
+    """Gemini Vision API로 음식 사진 분석.
+
+    Raises:
+        RecognitionError: AI가 음식을 못 찾음
+        RateLimitError: 호출 한도 초과
+        ServerOverloadError: 서버 과부하 (재시도 후에도 실패)
+        InvalidResponseError: AI 응답 파싱 실패
+        ConfigError: API 키 등 설정 문제
+        FoodAnalysisError: 기타 분류 안 된 에러
+    """
     client = _get_client()
 
     def _call():
@@ -99,7 +176,12 @@ def analyze_food_image(image_bytes: bytes, media_type: str = "image/jpeg") -> di
             ],
         )
         return _parse_json(response.text)
-    return _call_api(_call)
+
+    result = _call_api(_call)
+    # AI가 음식 인식 실패 응답을 보낸 경우
+    if not result or not result.get("foods"):
+        raise RecognitionError()
+    return result
 
 
 def estimate_food_nutrition(food_name: str) -> dict:
