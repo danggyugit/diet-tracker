@@ -16,11 +16,10 @@ import streamlit as st
 from config import PLOT_CFG, today_kst
 from services.auth_service import require_auth
 from services.sheets_service import (
-    get_daily_totals, get_top_foods, get_meals,
-    get_profile, get_weight_log, get_latest_weight, get_streak,
+    get_daily_totals, get_profile, get_weight_log, get_latest_weight, get_streak,
     get_exercise_log,
 )
-from services.calorie_service import calc_bmr, calc_tdee, calc_protein_g, evaluate_calorie_status
+from services.calorie_service import calc_bmr, calc_tdee, evaluate_calorie_status
 
 email = require_auth()
 st.title("📊 트렌드")
@@ -40,11 +39,9 @@ except (ValueError, TypeError):
 base_target = round(tdee - deficit_level)
 target = base_target  # 하위 호환: 기존 차트 참조용
 
-# ─── 기간 선택 ───────────────────────────────────────────────
-period = st.radio("기간", ["7일", "30일", "90일"], horizontal=True)
-days_map = {"7일": 7, "30일": 30, "90일": 90}
-days = days_map[period]
-
+# ─── 기간: 30일 고정 ─────────────────────────────────────────
+days = 30
+period = "30일"
 today = today_kst()
 start = (today - datetime.timedelta(days=days - 1)).isoformat()
 end = today.isoformat()
@@ -252,9 +249,9 @@ else:
     )
     st.plotly_chart(fig_weight, use_container_width=True)
 
-# ─── 에너지 균형 차트 (섭취 vs 소모 비교) ─────────────────────
+# ─── 에너지 균형 차트 (섭취·소모 막대 + 차이 라인) ────────────
 st.markdown("#### ⚡ 일별 에너지 균형")
-st.caption("섭취(주황)와 소모(파랑)의 차이를 한눈에 비교하세요.")
+st.caption("섭취(주황)·소모(파랑) 막대 + 차이(초록 라인) — 라인이 0 아래면 적자")
 
 if totals.empty:
     st.info("📝 식단 기록이 없습니다.")
@@ -268,7 +265,7 @@ else:
     bal_df["burned"] = bal_df["date"].apply(lambda d: float(burn_by_date.get(d, 0)))
     bal_df["tdee_base"] = tdee
     bal_df["total_expend"] = bal_df["tdee_base"] + bal_df["burned"]
-    bal_df["deficit"] = bal_df["total_cal"] - bal_df["total_expend"]
+    bal_df["diff"] = bal_df["total_cal"] - bal_df["total_expend"]  # 섭취 - 소모
 
     fig_bal = go.Figure()
     fig_bal.add_trace(go.Bar(
@@ -276,242 +273,37 @@ else:
         marker_color="#FBBF24", opacity=0.85,
     ))
     fig_bal.add_trace(go.Bar(
-        x=bal_df["label"], y=bal_df["total_expend"], name="소모 (TDEE+운동)",
+        x=bal_df["label"], y=bal_df["total_expend"], name="소모",
         marker_color="#3B82F6", opacity=0.65,
     ))
-    fig_bal.add_hline(
-        y=target, line_dash="dot", line_color="#4ADE80",
-        annotation_text=f"목표 {target:,}", annotation_position="right",
-    )
+    # 섭취 - 소모 라인 (보조 Y축)
+    fig_bal.add_trace(go.Scatter(
+        x=bal_df["label"], y=bal_df["diff"], name="섭취-소모",
+        mode="lines+markers",
+        line=dict(color="#4ADE80", width=2),
+        marker=dict(size=6, color="#4ADE80"),
+        yaxis="y2",
+    ))
     fig_bal.update_layout(
-        **PLOT_CFG, height=280, barmode="group",
-        xaxis_title=None, yaxis_title="kcal",
-        margin=dict(l=40, r=15, t=30, b=30),
+        **PLOT_CFG, height=320, barmode="group",
+        xaxis_title=None, yaxis_title="kcal (막대)",
+        yaxis2=dict(
+            title="섭취-소모 (라인)", overlaying="y", side="right",
+            zeroline=True, zerolinecolor="rgba(148,163,184,0.5)",
+            zerolinewidth=1.5, showgrid=False,
+        ),
+        margin=dict(l=40, r=50, t=30, b=30),
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="center", x=0.5),
     )
     st.plotly_chart(fig_bal, use_container_width=True)
 
-    # 누적 적자/흑자 차트
-    bal_df["cum_deficit"] = bal_df["deficit"].cumsum()
-    bal_df["cum_kg"] = bal_df["cum_deficit"] / 7700
-
-    fig_cum = go.Figure()
-    # 적자(음수) = 초록, 흑자(양수) = 빨강
-    colors = ["#4ADE80" if v <= 0 else "#FB7185" for v in bal_df["cum_deficit"]]
-    fig_cum.add_trace(go.Bar(
-        x=bal_df["label"], y=bal_df["cum_deficit"],
-        marker_color=colors, name="누적 칼로리",
-        hovertemplate="%{x}<br>누적 %{y:,.0f} kcal<br>≈ %{customdata:+.2f} kg<extra></extra>",
-        customdata=bal_df["cum_kg"],
-    ))
-    # 7,700 kcal 기준선 (1kg)
-    max_abs = max(abs(bal_df["cum_deficit"].max()), abs(bal_df["cum_deficit"].min()), 3850)
-    for kg_line in range(1, 4):
-        if kg_line * 7700 <= max_abs * 1.3:
-            fig_cum.add_hline(
-                y=-kg_line * 7700, line_dash="dot", line_color="rgba(74,222,128,0.3)",
-                annotation_text=f"-{kg_line}kg", annotation_position="left",
-            )
-    fig_cum.add_hline(y=0, line_color="rgba(148,163,184,0.4)")
-
-    fig_cum.update_layout(
-        **PLOT_CFG, height=240,
-        xaxis_title=None, yaxis_title="누적 kcal",
-        margin=dict(l=50, r=15, t=10, b=30),
-        showlegend=False,
-    )
-
-    cum_total = bal_df["cum_deficit"].iloc[-1] if len(bal_df) > 0 else 0
+    cum_total = bal_df["diff"].sum()
     cum_kg = cum_total / 7700
     cum_days = len(bal_df)
     st.markdown(
-        f"<div style='text-align:center;font-size:13px;color:#94A3B8;margin:-6px 0 4px;'>"
+        f"<div style='text-align:center;font-size:13px;color:#94A3B8;margin:4px 0;'>"
         f"📊 {cum_days}일 누적: <b style='color:{'#4ADE80' if cum_total <= 0 else '#FB7185'};'>"
         f"{cum_total:+,.0f} kcal</b> ≈ <b>{cum_kg:+.2f} kg</b></div>",
         unsafe_allow_html=True,
     )
-    st.plotly_chart(fig_cum, use_container_width=True)
 
-# ─── 칼로리 섭취 추이 (표 형식, 5단계 평가) ──────────────────
-st.markdown("#### 🔥 일별 칼로리 상세")
-_eval_mode_label = "순칼로리" if use_net_for_eval else "섭취 칼로리"
-_target_label = f"기본 {base_target:,}" + (" + 운동 보정" if use_net_for_eval else "")
-st.caption(f"섭취 칼로리 vs 일별 effective target 평가 · {_target_label} kcal")
-
-if not totals.empty:
-    totals_display = totals.copy()
-    totals_display["date_dt"] = pd.to_datetime(totals_display["date"])
-    totals_display["날짜"] = totals_display["date_dt"].apply(
-        lambda d: f"{d.month}/{d.day} ({weekday_names[d.weekday()]})"
-    )
-    totals_display["burned"] = totals_display["date"].apply(
-        lambda d: float(burn_by_date.get(d, 0))
-    )
-    totals_display["net"] = totals_display["total_cal"] - totals_display["burned"]
-
-    # 일별 effective target 계산 (식단 기록 페이지와 동일 기준)
-    if exercise_comp_mode == "daily":
-        totals_display["eff_target"] = totals_display["burned"].apply(
-            lambda b: base_target + int(b)
-        )
-    elif exercise_comp_mode == "avg7":
-        _avg7 = int(totals_display["burned"].sum() / len(totals_display)) if len(totals_display) else 0
-        totals_display["eff_target"] = base_target + _avg7
-    else:
-        totals_display["eff_target"] = base_target
-
-    # 평가: 섭취 vs effective target (모든 모드 통일)
-    totals_display["섭취"] = totals_display["total_cal"].apply(lambda c: f"{c:,.0f}")
-    totals_display["목표"] = totals_display["eff_target"].apply(lambda t: f"{t:,.0f}")
-    totals_display["운동"] = totals_display["burned"].apply(
-        lambda c: f"-{c:,.0f}" if c > 0 else "—"
-    )
-    totals_display["차이"] = totals_display.apply(
-        lambda r: f"{int(r['total_cal'] - r['eff_target']):+,}", axis=1
-    )
-    totals_display["평가"] = totals_display.apply(
-        lambda r: evaluate_calorie_status(r["total_cal"], r["eff_target"])[0], axis=1
-    )
-
-    cols = ["날짜", "섭취", "목표", "차이", "평가"]
-    if use_net_for_eval:
-        cols = ["날짜", "섭취", "운동", "목표", "차이", "평가"]
-    display_df = totals_display[cols].sort_values("날짜", ascending=False)
-    st.dataframe(display_df, use_container_width=True, hide_index=True, height=min(len(display_df) * 36 + 38, 400))
-
-    # 인사이트 (4단계 기반)
-    eval_results = totals_display.apply(
-        lambda r: evaluate_calorie_status(r["total_cal"], r["eff_target"])[2], axis=1
-    )
-    n_over = int((eval_results == "over").sum())
-    n_too_low = int((eval_results == "too_low").sum())
-    total_days = len(totals_display)
-
-    if n_too_low > 0:
-        st.warning(f"⚠️ {total_days}일 중 {n_too_low}일 칼로리 너무 적음 — 에너지 가용성 부족 위험 (근손실·호르몬 저하)")
-    if n_over > total_days * 0.5:
-        st.warning(f"⚠️ {total_days}일 중 {n_over}일 목표 초과 — 식단 조절이 필요합니다.")
-    elif n_over == 0 and n_too_low == 0:
-        st.success(f"✅ {total_days}일 모두 적정 범위 — 순항 중!")
-
-# ═══════════════════════════════════════════════════════════════
-# 섹션 3: 패턴 발견
-# ═══════════════════════════════════════════════════════════════
-
-st.markdown("---")
-st.markdown("## 🔍 패턴 발견")
-
-pc1, pc2 = st.columns(2)
-
-# ─── 자주 먹은 음식 TOP 5 ────────────────────────────────────
-with pc1:
-    st.markdown("#### 🏆 자주 먹은 음식 TOP 5")
-    st.caption("반복되는 음식을 즐겨찾기에 등록하면 입력이 빨라져요.")
-
-    top_foods = get_top_foods(email, days)
-    if top_foods.empty:
-        st.caption("데이터 없음")
-    else:
-        max_count = int(top_foods["count"].max())
-        rank_html = "<div style='margin-top:8px;'>"
-        for rank, (_, row) in enumerate(top_foods.iterrows(), 1):
-            cnt = int(row["count"])
-            pct = cnt / max_count * 100
-            medal = ["🥇", "🥈", "🥉", "4️⃣", "5️⃣"][rank - 1]
-            rank_html += (
-                f"<div style='margin-bottom:10px;'>"
-                f"<div style='display:flex;align-items:center;gap:6px;font-size:14px;'>"
-                f"<span>{medal}</span>"
-                f"<span style='font-weight:600;color:#F8FAFC;'>{row['food_name']}</span>"
-                f"<span style='margin-left:auto;font-size:13px;color:#94A3B8;'>{cnt}회</span>"
-                f"</div>"
-                f"<div style='background:rgba(30,41,59,0.6);border-radius:4px;height:6px;margin-top:4px;'>"
-                f"<div style='width:{pct}%;height:100%;background:#8B5CF6;border-radius:4px;'></div>"
-                f"</div></div>"
-            )
-        rank_html += "</div>"
-        st.markdown(rank_html, unsafe_allow_html=True)
-
-# ─── 요일별 평균 섭취 ──────────────────────────────────────
-with pc2:
-    st.markdown("#### 📅 요일별 섭취 패턴")
-    st.caption("주말에 과식하는 경향이 있는지 확인하세요.")
-
-    if totals.empty:
-        st.caption("데이터 없음")
-    else:
-        t = totals.copy()
-        t["date_dt"] = pd.to_datetime(t["date"])
-        t["weekday"] = t["date_dt"].dt.dayofweek
-        weekday_names = ["월", "화", "수", "목", "금", "토", "일"]
-        weekday_avg = t.groupby("weekday")["total_cal"].mean().reset_index()
-        weekday_avg["name"] = weekday_avg["weekday"].apply(lambda x: weekday_names[x])
-
-        colors = ["#FB7185" if c > target else "#60A5FA" for c in weekday_avg["total_cal"]]
-        fig_wd = go.Figure(go.Bar(
-            x=weekday_avg["name"], y=weekday_avg["total_cal"],
-            marker_color=colors,
-            text=[f"{c:,.0f}" for c in weekday_avg["total_cal"]],
-            textposition="outside",
-        ))
-        fig_wd.add_hline(
-            y=target, line_dash="dash", line_color="#F8FAFC",
-            annotation_text=f"목표", annotation_position="right",
-        )
-        fig_wd.update_layout(
-            **PLOT_CFG, height=240,
-            xaxis_title="", yaxis_title="평균 kcal",
-            margin=dict(l=40, r=20, t=30, b=30),
-            bargap=0.4,
-        )
-        st.plotly_chart(fig_wd, use_container_width=True)
-
-# ─── 매크로 분포 (기간 전체) ─────────────────────────────────
-if not totals.empty:
-    st.markdown("#### 🥗 영양소 분포")
-    st.caption(f"{period} 평균 영양소 섭취 비율입니다. 단백질 비율이 너무 낮지 않은지 확인하세요.")
-
-    t_c = totals["total_carbs"].sum() if "total_carbs" in totals.columns else 0
-    t_p = totals["total_protein"].sum() if "total_protein" in totals.columns else 0
-    t_f = totals["total_fat"].sum() if "total_fat" in totals.columns else 0
-    total_g = t_c + t_p + t_f
-
-    if total_g > 0:
-        avg_kcal_str = f"{totals['total_cal'].mean():,.0f}"
-        fig_pie = go.Figure(go.Pie(
-            labels=["탄수화물", "단백질", "지방"],
-            values=[t_c, t_p, t_f],
-            marker=dict(colors=["#4ADE80", "#60A5FA", "#FBBF24"]),
-            textinfo="label+percent",
-            textfont=dict(size=15, color="#F8FAFC"),
-            hole=0.6,
-        ))
-        fig_pie.update_layout(
-            **PLOT_CFG, height=260, showlegend=False,
-            margin=dict(l=10, r=10, t=10, b=10),
-            annotations=[dict(
-                text=f"<span style='font-size:12px;color:#94A3B8;'>일평균</span><br>"
-                     f"<b style='font-size:22px;'>{avg_kcal_str}</b><br>"
-                     f"<span style='font-size:11px;color:#94A3B8;'>kcal</span>",
-                x=0.5, y=0.5, showarrow=False,
-            )],
-        )
-        # 도넛을 중앙에 배치
-        pc_left, pc_center, pc_right = st.columns([1, 2, 1])
-        with pc_center:
-            st.plotly_chart(fig_pie, use_container_width=True)
-
-        # 단백질 체크 — 감량 강도 기반 (정석)
-        pct_p = t_p / total_g * 100
-        target_p_per_day, protein_mult = calc_protein_g(latest_weight, deficit_level)
-        avg_p_per_day = t_p / len(totals)
-        if avg_p_per_day < target_p_per_day * 0.8:
-            st.warning(
-                f"⚠️ 단백질 섭취가 부족합니다. "
-                f"일평균 {avg_p_per_day:.0f}g (목표 {target_p_per_day:.0f}g · 체중×{protein_mult}g)"
-            )
-        elif avg_p_per_day >= target_p_per_day:
-            st.success(
-                f"✅ 단백질 섭취 충분! "
-                f"일평균 {avg_p_per_day:.0f}g (목표 {target_p_per_day:.0f}g)"
-            )

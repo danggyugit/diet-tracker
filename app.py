@@ -23,7 +23,8 @@ render_sidebar_account()
 
 PAGES = {
     "기록": [
-        st.Page("pages/record.py", title="식단 및 운동 기록", icon=":material/restaurant:"),
+        st.Page("pages/record.py", title="식단 기록", icon=":material/restaurant:"),
+        st.Page("pages/exercise.py", title="운동 기록", icon=":material/directions_run:"),
     ],
     "분석": [
         st.Page("pages/calendar_view.py", title="캘린더", icon=":material/calendar_month:"),
@@ -43,7 +44,8 @@ pg = st.navigation(PAGES, position="sidebar")
 # ─── 상단 네비게이션 바 (HTML grid + query_params) ────────────
 if is_logged_in():
     NAV_ITEMS = [
-        ("🍽️", "record", "pages/record.py", "식단 및 운동 기록"),
+        ("🍽️", "record", "pages/record.py", "식단 기록"),
+        ("🏃", "exercise", "pages/exercise.py", "운동 기록"),
         ("📅", "calendar", "pages/calendar_view.py", "캘린더"),
         ("📊", "trends", "pages/trends.py", "트렌드"),
         ("👤", "profile", "pages/profile.py", "프로필"),
@@ -66,7 +68,7 @@ if is_logged_in():
     normal_style = base_style + "background:rgba(30,41,59,0.5);border:1px solid rgba(148,163,184,0.2);"
     active_style = base_style + "background:rgba(59,130,246,0.25);border:2px solid #3B82F6;"
 
-    nav_html = "<div style='display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-bottom:10px;'>"
+    nav_html = "<div style='display:grid;grid-template-columns:repeat(6,1fr);gap:5px;margin-bottom:10px;'>"
     for icon, key, _, title in NAV_ITEMS:
         style = active_style if title == active_title else normal_style
         nav_html += f"<a href='?nav={key}' target='_self' style='{style}'>{icon}</a>"

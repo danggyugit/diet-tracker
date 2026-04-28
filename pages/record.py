@@ -14,7 +14,7 @@ import streamlit as st
 
 from config import (
     MEAL_TYPES, MAX_FILE_SIZE, PLOT_CFG, CONDITION_OPTIONS,
-    EXERCISE_OPTIONS, WATER_TARGET_ML, today_kst,
+    WATER_TARGET_ML, today_kst,
 )
 from services.auth_service import require_auth
 from services.gemini_service import analyze_food_image, estimate_multiple_foods
@@ -28,8 +28,7 @@ from services.sheets_service import (
     delete_meals_by_type,
     get_latest_weight, save_weight, get_daily_totals,
     save_memo, get_memo,
-    save_exercise, get_daily_burned, get_exercise_log,
-    delete_exercise_row, update_exercise_row,
+    get_daily_burned, get_exercise_log,
     save_water, get_water_log, reset_water,
     get_favorites, get_recent_foods, get_yesterday_meals, get_streak,
     lookup_food_nutrition, auto_add_favorites_from_meals,
@@ -382,12 +381,9 @@ default_meal = _auto_meal_type()
 # 탭 구성
 # ═══════════════════════════════════════════════════════════════
 
-st.divider()
-tab_meal, tab_exercise, tab_water, tab_memo = st.tabs([
-    "🍽️ 식사", "🏃 운동", "💧 물", "📝 메모"
-])
+tab_meal, tab_water, tab_memo = st.tabs(["🍽️ 식사", "💧 물", "📝 메모"])
 
-# ─── 탭 1: 식사 ─────────────────────────────────────────────
+# ─── 탭 1: 식사 (입력 방법 pills 기반 컴팩트 레이아웃) ────────
 with tab_meal:
     meal_type = st.radio(
         "식사 유형", MEAL_TYPES,
@@ -395,7 +391,7 @@ with tab_meal:
         horizontal=True, key=f"meal_type_{st.session_state.form_version}",
     )
 
-    # 어제 식단 복사 버튼
+    # 어제 식단 복사 (컴팩트 한 줄)
     yest_meals = get_yesterday_meals(email, date_str)
     yest_meal_df = yest_meals[yest_meals["meal_type"] == meal_type] if not yest_meals.empty else pd.DataFrame()
     if not yest_meal_df.empty:
@@ -418,13 +414,38 @@ with tab_meal:
             st.toast(f"✅ 어제 {meal_type} {len(foods_to_copy)}개 복사!", icon="📋")
             st.rerun()
 
-    # 최근 먹은 음식 원터치
-    recent = get_recent_foods(email, days=3, limit=8)
-    if not recent.empty:
-        with st.expander(f"🕐 최근 먹은 음식 ({len(recent)}개)", expanded=False):
+    favorites = get_favorites(email)
+    fav_names = [f"{f['food_name']} ({f.get('calories', 0)}kcal)" for f in favorites] if favorites else []
+    recent = get_recent_foods(email, days=7, limit=10)
+
+    # 입력 방법 pills (한 가지만 보여서 스크롤 절약)
+    method = st.pills(
+        "입력 방법",
+        ["📷 사진", "✏️ 수동", "⭐ 즐겨찾기", "🕐 최근"],
+        default="📷 사진",
+        label_visibility="collapsed",
+    )
+
+    # 변수 초기화
+    uploaded_files = []
+    manual_text = ""
+    selected_favs = []
+    meal_submitted = False
+
+    if method == "🕐 최근":
+        # 최근 음식은 직접 클릭 → 즉시 저장 (form 불필요)
+        if recent.empty:
+            st.caption("최근 7일 식사 기록이 없습니다.")
+        else:
             for i, rf in recent.iterrows():
                 rc1, rc2 = st.columns([4, 1])
-                rc1.caption(f"**{rf['food_name']}** · {int(rf['calories'])}kcal")
+                rc1.markdown(
+                    f"<div style='padding:6px 0;'>"
+                    f"<b>{rf['food_name']}</b> "
+                    f"<span style='color:#94A3B8;font-size:12px;'>· {int(rf['calories'])}kcal</span>"
+                    f"</div>",
+                    unsafe_allow_html=True,
+                )
                 if rc2.button("추가", key=f"recent_{i}", use_container_width=True):
                     save_meals(email, date_str, meal_type, [{
                         "name": rf["food_name"], "amount": rf.get("amount", ""),
@@ -434,40 +455,31 @@ with tab_meal:
                     }])
                     st.toast(f"✅ {rf['food_name']} 추가!", icon="🕐")
                     st.rerun()
+    else:
+        with st.form(f"meal_form_{st.session_state.form_version}"):
+            if method == "📷 사진":
+                uploaded_files = st.file_uploader(
+                    "사진 업로드 (여러 장 가능)", type=["jpg", "jpeg", "png"],
+                    help="JPG, PNG / 최대 10MB",
+                    accept_multiple_files=True,
+                )
+            elif method == "✏️ 수동":
+                manual_text = st.text_area(
+                    "음식 목록 (한 줄에 하나씩)",
+                    placeholder="연어스테이크 1인분\n함박스테이크 반인분\n와인 1병",
+                    height=100,
+                )
+            elif method == "⭐ 즐겨찾기":
+                if fav_names:
+                    selected_favs = st.multiselect(
+                        "음식 선택", fav_names,
+                    )
+                else:
+                    st.caption("즐겨찾기가 비어있습니다. 설정 > 즐겨찾기에서 등록하세요.")
 
-    # 입력 폼
-    favorites = get_favorites(email)
-    fav_names = [f"{f['food_name']} ({f.get('calories', 0)}kcal)" for f in favorites] if favorites else []
-
-    with st.form(f"meal_form_{st.session_state.form_version}"):
-        st.markdown("**📷 음식 사진** (여러 장 가능)")
-        uploaded_files = st.file_uploader(
-            "사진 업로드", type=["jpg", "jpeg", "png"],
-            help="JPG, PNG / 최대 10MB", label_visibility="collapsed",
-            accept_multiple_files=True,
-        )
-
-        st.markdown("---")
-        st.markdown("**✏️ 수동 음식 추가** (한 줄에 하나씩)")
-        manual_text = st.text_area(
-            "음식 목록",
-            placeholder="연어스테이크 1인분\n함박스테이크 반인분\n와인 1병",
-            height=100, label_visibility="collapsed",
-        )
-
-        st.markdown("---")
-        st.markdown("**⭐ 즐겨찾기에서 선택**")
-        if fav_names:
-            selected_favs = st.multiselect(
-                "음식 선택", fav_names, label_visibility="collapsed",
+            meal_submitted = st.form_submit_button(
+                "🔍 분석 및 저장", type="primary", use_container_width=True,
             )
-        else:
-            st.caption("즐겨찾기가 비어있습니다. 설정 > 즐겨찾기에서 등록하세요.")
-            selected_favs = []
-
-        meal_submitted = st.form_submit_button(
-            "🔍 AI 분석 및 저장", type="primary", use_container_width=True,
-        )
 
     # 폼 제출 처리
     if meal_submitted:
@@ -560,37 +572,7 @@ with tab_meal:
             st.session_state.form_version += 1
             st.rerun()
 
-# ─── 탭 2: 운동 ─────────────────────────────────────────────
-with tab_exercise:
-    ev = st.session_state.ex_form_version
-    ex_display = [f"{e['icon']} {e['name']}" for e in EXERCISE_OPTIONS]
-    selected_exercises = st.multiselect(
-        "운동 선택 (여러 개 가능)", ex_display, key=f"ex_multi_{ev}",
-    )
-
-    if selected_exercises:
-        ex_durations = {}
-        for sel_ex in selected_exercises:
-            idx = ex_display.index(sel_ex)
-            dur = st.number_input(
-                f"{sel_ex} 시간 (분)",
-                min_value=5, max_value=300, value=30, step=5,
-                key=f"exdur_{idx}_{ev}",
-            )
-            ex_durations[idx] = dur
-
-        if st.button("🏃 운동 저장", use_container_width=True, type="primary"):
-            total_burned = 0
-            for idx, dur in ex_durations.items():
-                ex_info = EXERCISE_OPTIONS[idx]
-                met = ex_info["met"] if ex_info["met"] > 0 else 5.0
-                save_exercise(email, date_str, ex_info["name"], dur, met, latest_weight)
-                total_burned += round(met * latest_weight * dur / 60)
-            st.toast(f"✅ {len(ex_durations)}개 운동 ({total_burned}kcal 소모) 저장!", icon="🏃")
-            st.session_state.ex_form_version += 1
-            st.rerun()
-
-# ─── 탭 3: 물 ────────────────────────────────────────────────
+# ─── 탭 2: 물 ────────────────────────────────────────────────
 with tab_water:
     total_water = get_water_log(email, date_str)
     pct = min(total_water / WATER_TARGET_ML * 100, 100)
@@ -622,7 +604,7 @@ with tab_water:
             st.toast(f"✅ 물 {ml}ml 추가!", icon="💧")
             st.rerun()
 
-# ─── 탭 4: 메모 ─────────────────────────────────────────────
+# ─── 탭 3: 메모 ─────────────────────────────────────────────
 with tab_memo:
     existing_memo = get_memo(email, date_str)
     existing_cond = existing_memo.get("condition", "") if existing_memo else ""
@@ -807,62 +789,11 @@ else:
                     delete_meal_row(email, date_str, row["food_name"], str(row.get("created_at", "")))
                     st.rerun()
 
-# ─── 운동 기록 (수정/삭제 + 삭제취소) ────────────────────────
+# ─── 운동 요약 (상세 편집은 운동 페이지에서) ────────────────
 ex_log = get_exercise_log(email, date_str, date_str)
-if not ex_log.empty or st.session_state.last_deleted_ex:
-    st.markdown(f"**🏃 운동 기록** ({burned_cal:,.0f} kcal 소모)")
-
-    if st.session_state.last_deleted_ex:
-        deleted_ex = st.session_state.last_deleted_ex
-        euc1, euc2 = st.columns([4, 1])
-        euc1.caption(f"🗑️ '{deleted_ex['exercise_name']}' 운동 삭제됨")
-        if euc2.button("↩ 되돌리기", key="btn_undo_ex", use_container_width=True):
-            save_exercise(email, date_str, deleted_ex["exercise_name"],
-                         int(deleted_ex["duration_min"]), float(deleted_ex["met"]), latest_weight)
-            st.session_state.last_deleted_ex = None
-            st.toast("✅ 복구됨", icon="↩")
-            st.rerun()
-
-    for ex_idx, ex in ex_log.iterrows():
-        ex_key = f"ex_{ex_idx}"
-        is_ex_editing = st.session_state.editing_ex_key == ex_key
-
-        if is_ex_editing:
-            with st.form(f"edit_ex_{ex_key}"):
-                st.markdown(f"**{ex['exercise_name']}** 수정")
-                new_dur = st.number_input("시간 (분)", value=int(ex["duration_min"]),
-                    min_value=5, max_value=300, step=5)
-                ebc1, ebc2 = st.columns(2)
-                if ebc1.form_submit_button("저장", use_container_width=True, type="primary"):
-                    update_exercise_row(email, date_str, ex["exercise_name"],
-                        str(ex.get("created_at", "")), new_dur, latest_weight)
-                    st.session_state.editing_ex_key = None
-                    st.toast("✅ 수정됨", icon="✏️")
-                    st.rerun()
-                if ebc2.form_submit_button("취소", use_container_width=True):
-                    st.session_state.editing_ex_key = None
-                    st.rerun()
-        else:
-            st.markdown(
-                f"<div style='background:rgba(30,41,59,0.4);border-radius:8px;padding:8px 12px;margin:6px 0;'>"
-                f"<span style='font-weight:600;'>{ex['exercise_name']}</span> "
-                f"<span style='color:#94A3B8;'>{int(ex['duration_min'])}분 · {int(ex['calories_burned'])}kcal</span>"
-                f"</div>",
-                unsafe_allow_html=True,
-            )
-            ebc1, ebc2, ebc3 = st.columns([1, 1, 4])
-            if ebc1.button("수정", key=f"exedit_{ex_key}", use_container_width=True):
-                st.session_state.editing_ex_key = ex_key
-                st.rerun()
-            if ebc2.button("삭제", key=f"exdel_{ex_key}", use_container_width=True):
-                st.session_state.last_deleted_ex = {
-                    "exercise_name": ex["exercise_name"],
-                    "duration_min": ex["duration_min"],
-                    "met": ex.get("met", 5.0),
-                    "calories_burned": ex["calories_burned"],
-                }
-                delete_exercise_row(email, date_str, ex["exercise_name"], str(ex.get("created_at", "")))
-                st.rerun()
+if not ex_log.empty:
+    ex_count = len(ex_log)
+    st.caption(f"🏃 운동 {ex_count}개 · {burned_cal:,.0f} kcal 소모 — 상세 편집은 [운동 기록] 페이지에서")
 
 # ─── 물 섭취 표시 ────────────────────────────────────────────
 if total_water > 0:

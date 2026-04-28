@@ -46,35 +46,12 @@ if _comp_raw not in ("off", "avg7", "daily"):
     _comp_raw = "off"
 cal_comp_mode = _comp_raw
 
-# ─── 월/년 네비게이터 (모바일 가로 강제) ────────────────────
+# ─── 연/월 드롭다운 (한 줄) ──────────────────────────────────
 if "cal_year" not in st.session_state:
     st.session_state.cal_year = today_kst().year
 if "cal_month" not in st.session_state:
     st.session_state.cal_month = today_kst().month
 
-# query_params 기반 네비게이션 (HTML 그리드로 가로 고정)
-qp = st.query_params
-if "cal_nav" in qp:
-    nav_action = qp["cal_nav"]
-    if nav_action == "prev":
-        if st.session_state.cal_month == 1:
-            st.session_state.cal_month = 12
-            st.session_state.cal_year -= 1
-        else:
-            st.session_state.cal_month -= 1
-    elif nav_action == "next":
-        if st.session_state.cal_month == 12:
-            st.session_state.cal_month = 1
-            st.session_state.cal_year += 1
-        else:
-            st.session_state.cal_month += 1
-    elif nav_action == "current":
-        st.session_state.cal_year = today_kst().year
-        st.session_state.cal_month = today_kst().month
-    del st.query_params["cal_nav"]
-    st.rerun()
-
-# ─── 연/월 드롭다운 선택 ─────────────────────────────────────
 _this_year = today_kst().year
 year_options = list(range(_this_year - 3, _this_year + 2))
 month_options = list(range(1, 13))
@@ -104,35 +81,8 @@ if sel_year != st.session_state.cal_year or sel_month != st.session_state.cal_mo
     st.session_state.cal_month = sel_month
     st.rerun()
 
-nav_html = (
-    f"<div style='display:grid;grid-template-columns:1fr 2fr 1fr;"
-    f"gap:8px;align-items:center;margin:12px 0;'>"
-    f"<a href='?cal_nav=prev' target='_self' "
-    f"style='background:rgba(30,41,59,0.5);border:1px solid rgba(148,163,184,0.2);"
-    f"color:#F8FAFC;padding:10px 0;border-radius:8px;text-align:center;"
-    f"text-decoration:none;font-size:14px;font-weight:500;'>◀ 이전달</a>"
-    f"<a href='?cal_nav=current' target='_self' "
-    f"style='display:block;text-align:center;font-size:16px;font-weight:700;"
-    f"color:#F8FAFC;text-decoration:none;padding:10px 0;border-radius:8px;"
-    f"background:rgba(30,41,59,0.5);border:1px solid rgba(148,163,184,0.2);'>"
-    f"{today_kst().year}년 {today_kst().month}월</a>"
-    f"<a href='?cal_nav=next' target='_self' "
-    f"style='background:rgba(30,41,59,0.5);border:1px solid rgba(148,163,184,0.2);"
-    f"color:#F8FAFC;padding:10px 0;border-radius:8px;text-align:center;"
-    f"text-decoration:none;font-size:14px;font-weight:500;'>다음달 ▶</a>"
-    f"</div>"
-)
-st.markdown(nav_html, unsafe_allow_html=True)
-
 year = st.session_state.cal_year
 month = st.session_state.cal_month
-
-if year != today_kst().year or month != today_kst().month:
-    st.markdown(
-        f"<div style='text-align:center;font-size:18px;font-weight:700;margin:4px 0 8px;'>"
-        f"{year}년 {month}월</div>",
-        unsafe_allow_html=True,
-    )
 
 # ─── 해당 월 데이터 로드 ─────────────────────────────────────
 first_day = datetime.date(year, month, 1)
