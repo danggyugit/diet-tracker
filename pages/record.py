@@ -12,10 +12,7 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
-from config import (
-    MEAL_TYPES, MAX_FILE_SIZE, PLOT_CFG, CONDITION_OPTIONS,
-    WATER_TARGET_ML, today_kst,
-)
+from config import MEAL_TYPES, MAX_FILE_SIZE, PLOT_CFG, today_kst
 from services.auth_service import require_auth
 from services.gemini_service import analyze_food_image, estimate_multiple_foods
 from services.calorie_service import (
@@ -27,9 +24,7 @@ from services.sheets_service import (
     get_profile, get_meals_for_date, save_meals, delete_meal_row, update_meal_row,
     delete_meals_by_type,
     get_latest_weight, save_weight, get_daily_totals,
-    save_memo, get_memo,
     get_daily_burned, get_exercise_log,
-    save_water, get_water_log, reset_water,
     get_favorites, get_recent_foods, get_yesterday_meals, get_streak,
     lookup_food_nutrition, auto_add_favorites_from_meals,
 )
@@ -137,24 +132,6 @@ else:
 daily_budget = base_budget + exercise_boost
 target_fat, _fat_source = calc_fat_g(daily_budget, latest_weight)
 target_carbs = calc_carbs_g(daily_budget, target_protein, target_fat)
-
-st.markdown(
-    "<div style='display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin:4px 0 8px;'>"
-    "<a href='?date_nav=prev' target='_self' style='background:rgba(30,41,59,0.5);"
-    "border:1px solid rgba(148,163,184,0.2);color:#F8FAFC;padding:8px 0;"
-    "border-radius:8px;text-align:center;text-decoration:none;font-size:13px;"
-    "font-weight:500;'>◀ 어제</a>"
-    "<a href='?date_nav=today' target='_self' style='background:rgba(30,41,59,0.5);"
-    "border:1px solid rgba(148,163,184,0.2);color:#F8FAFC;padding:8px 0;"
-    "border-radius:8px;text-align:center;text-decoration:none;font-size:13px;"
-    "font-weight:500;'>오늘</a>"
-    "<a href='?date_nav=next' target='_self' style='background:rgba(30,41,59,0.5);"
-    "border:1px solid rgba(148,163,184,0.2);color:#F8FAFC;padding:8px 0;"
-    "border-radius:8px;text-align:center;text-decoration:none;font-size:13px;"
-    "font-weight:500;'>내일 ▶</a>"
-    "</div>",
-    unsafe_allow_html=True,
-)
 
 with st.expander("⚖️ 체중 기록", expanded=False):
     wc1, wc2 = st.columns([3, 1])
@@ -300,26 +277,6 @@ def _bar_html(icon, name, cur, goal, color):
     )
 
 if t_carbs + t_protein + t_fat > 0:
-    dc_l, dc_c, dc_r = st.columns([1, 2, 1])
-    with dc_c:
-        fig = go.Figure(go.Pie(
-            labels=["탄수화물", "단백질", "지방"],
-            values=[t_carbs, t_protein, t_fat],
-            marker=dict(colors=["#4ADE80", "#60A5FA", "#FBBF24"]),
-            textinfo="percent", textposition="inside",
-            textfont=dict(size=12, color="#0F172A"),
-            hole=0.58, sort=False,
-            hovertemplate="%{label}: %{value:.0f}g<extra></extra>",
-        ))
-        fig.update_layout(**PLOT_CFG, height=180, showlegend=False,
-            margin=dict(l=5, r=5, t=5, b=5),
-            annotations=[dict(
-                text=f"<b>{eaten_cal:,.0f}</b><br><span style='font-size:10px;color:#94A3B8;'>kcal</span>",
-                x=0.5, y=0.5, font=dict(size=16), showarrow=False,
-            )],
-        )
-        st.plotly_chart(fig, use_container_width=True)
-
     st.markdown(
         _bar_html("🍚", "탄수화물", t_carbs, target_carbs, "#4ADE80")
         + _bar_html("🥩", "단백질", t_protein, target_protein, "#60A5FA")
@@ -381,244 +338,187 @@ default_meal = _auto_meal_type()
 # 탭 구성
 # ═══════════════════════════════════════════════════════════════
 
-tab_meal, tab_water, tab_memo = st.tabs(["🍽️ 식사", "💧 물", "📝 메모"])
+# ─── 식사 (단일 섹션, 탭 제거) ────────────────────────────────
+meal_type = st.radio(
+    "식사 유형", MEAL_TYPES,
+    index=MEAL_TYPES.index(default_meal),
+    horizontal=True, key=f"meal_type_{st.session_state.form_version}",
+)
 
-# ─── 탭 1: 식사 (입력 방법 pills 기반 컴팩트 레이아웃) ────────
-with tab_meal:
-    meal_type = st.radio(
-        "식사 유형", MEAL_TYPES,
-        index=MEAL_TYPES.index(default_meal),
-        horizontal=True, key=f"meal_type_{st.session_state.form_version}",
-    )
+# 어제 식단 복사 (컴팩트 한 줄)
+yest_meals = get_yesterday_meals(email, date_str)
+yest_meal_df = yest_meals[yest_meals["meal_type"] == meal_type] if not yest_meals.empty else pd.DataFrame()
+if not yest_meal_df.empty:
+    total_y = yest_meal_df["total_cal"].astype(float).sum() if "total_cal" in yest_meal_df.columns else 0
+    if st.button(f"📋 어제 {meal_type} 복사 ({len(yest_meal_df)}개, {total_y:,.0f}kcal)",
+                 use_container_width=True, key="btn_copy_yesterday"):
+        foods_to_copy = []
+        for _, row in yest_meal_df.iterrows():
+            foods_to_copy.append({
+                "name": row.get("food_name", ""),
+                "amount": row.get("amount", ""),
+                "calories": int(row.get("calories", 0)),
+                "carbs": int(row.get("carbs", 0)),
+                "protein": int(row.get("protein", 0)),
+                "fat": int(row.get("fat", 0)),
+                "quantity": float(row.get("quantity", 1.0)),
+                "source": "copy",
+            })
+        save_meals(email, date_str, meal_type, foods_to_copy)
+        st.toast(f"✅ 어제 {meal_type} {len(foods_to_copy)}개 복사!", icon="📋")
+        st.rerun()
 
-    # 어제 식단 복사 (컴팩트 한 줄)
-    yest_meals = get_yesterday_meals(email, date_str)
-    yest_meal_df = yest_meals[yest_meals["meal_type"] == meal_type] if not yest_meals.empty else pd.DataFrame()
-    if not yest_meal_df.empty:
-        total_y = yest_meal_df["total_cal"].astype(float).sum() if "total_cal" in yest_meal_df.columns else 0
-        if st.button(f"📋 어제 {meal_type} 복사 ({len(yest_meal_df)}개, {total_y:,.0f}kcal)",
-                     use_container_width=True, key="btn_copy_yesterday"):
-            foods_to_copy = []
-            for _, row in yest_meal_df.iterrows():
-                foods_to_copy.append({
-                    "name": row.get("food_name", ""),
-                    "amount": row.get("amount", ""),
-                    "calories": int(row.get("calories", 0)),
-                    "carbs": int(row.get("carbs", 0)),
-                    "protein": int(row.get("protein", 0)),
-                    "fat": int(row.get("fat", 0)),
-                    "quantity": float(row.get("quantity", 1.0)),
-                    "source": "copy",
-                })
-            save_meals(email, date_str, meal_type, foods_to_copy)
-            st.toast(f"✅ 어제 {meal_type} {len(foods_to_copy)}개 복사!", icon="📋")
-            st.rerun()
+favorites = get_favorites(email)
+fav_names = [f"{f['food_name']} ({f.get('calories', 0)}kcal)" for f in favorites] if favorites else []
+recent = get_recent_foods(email, days=7, limit=10)
 
-    favorites = get_favorites(email)
-    fav_names = [f"{f['food_name']} ({f.get('calories', 0)}kcal)" for f in favorites] if favorites else []
-    recent = get_recent_foods(email, days=7, limit=10)
+# 입력 방법 pills (한 가지만 보여서 스크롤 절약)
+method = st.pills(
+    "입력 방법",
+    ["📷 사진", "✏️ 수동", "⭐ 즐겨찾기", "🕐 최근"],
+    default="📷 사진",
+    label_visibility="collapsed",
+)
 
-    # 입력 방법 pills (한 가지만 보여서 스크롤 절약)
-    method = st.pills(
-        "입력 방법",
-        ["📷 사진", "✏️ 수동", "⭐ 즐겨찾기", "🕐 최근"],
-        default="📷 사진",
-        label_visibility="collapsed",
-    )
+# 변수 초기화
+uploaded_files = []
+manual_text = ""
+selected_favs = []
+meal_submitted = False
 
-    # 변수 초기화
-    uploaded_files = []
-    manual_text = ""
-    selected_favs = []
-    meal_submitted = False
-
-    if method == "🕐 최근":
-        # 최근 음식은 직접 클릭 → 즉시 저장 (form 불필요)
-        if recent.empty:
-            st.caption("최근 7일 식사 기록이 없습니다.")
-        else:
-            for i, rf in recent.iterrows():
-                rc1, rc2 = st.columns([4, 1])
-                rc1.markdown(
-                    f"<div style='padding:6px 0;'>"
-                    f"<b>{rf['food_name']}</b> "
-                    f"<span style='color:#94A3B8;font-size:12px;'>· {int(rf['calories'])}kcal</span>"
-                    f"</div>",
-                    unsafe_allow_html=True,
-                )
-                if rc2.button("추가", key=f"recent_{i}", use_container_width=True):
-                    save_meals(email, date_str, meal_type, [{
-                        "name": rf["food_name"], "amount": rf.get("amount", ""),
-                        "calories": int(rf["calories"]), "carbs": int(rf["carbs"]),
-                        "protein": int(rf["protein"]), "fat": int(rf["fat"]),
-                        "quantity": 1.0, "source": "recent",
-                    }])
-                    st.toast(f"✅ {rf['food_name']} 추가!", icon="🕐")
-                    st.rerun()
+if method == "🕐 최근":
+    # 최근 음식은 직접 클릭 → 즉시 저장 (form 불필요)
+    if recent.empty:
+        st.caption("최근 7일 식사 기록이 없습니다.")
     else:
-        with st.form(f"meal_form_{st.session_state.form_version}"):
-            if method == "📷 사진":
-                uploaded_files = st.file_uploader(
-                    "사진 업로드 (여러 장 가능)", type=["jpg", "jpeg", "png"],
-                    help="JPG, PNG / 최대 10MB",
-                    accept_multiple_files=True,
-                )
-            elif method == "✏️ 수동":
-                manual_text = st.text_area(
-                    "음식 목록 (한 줄에 하나씩)",
-                    placeholder="연어스테이크 1인분\n함박스테이크 반인분\n와인 1병",
-                    height=100,
-                )
-            elif method == "⭐ 즐겨찾기":
-                if fav_names:
-                    selected_favs = st.multiselect(
-                        "음식 선택", fav_names,
-                    )
-                else:
-                    st.caption("즐겨찾기가 비어있습니다. 설정 > 즐겨찾기에서 등록하세요.")
-
-            meal_submitted = st.form_submit_button(
-                "🔍 분석 및 저장", type="primary", use_container_width=True,
+        for i, rf in recent.iterrows():
+            rc1, rc2 = st.columns([4, 1])
+            rc1.markdown(
+                f"<div style='padding:6px 0;'>"
+                f"<b>{rf['food_name']}</b> "
+                f"<span style='color:#94A3B8;font-size:12px;'>· {int(rf['calories'])}kcal</span>"
+                f"</div>",
+                unsafe_allow_html=True,
             )
+            if rc2.button("추가", key=f"recent_{i}", use_container_width=True):
+                save_meals(email, date_str, meal_type, [{
+                    "name": rf["food_name"], "amount": rf.get("amount", ""),
+                    "calories": int(rf["calories"]), "carbs": int(rf["carbs"]),
+                    "protein": int(rf["protein"]), "fat": int(rf["fat"]),
+                    "quantity": 1.0, "source": "recent",
+                }])
+                st.toast(f"✅ {rf['food_name']} 추가!", icon="🕐")
+                st.rerun()
+else:
+    with st.form(f"meal_form_{st.session_state.form_version}"):
+        if method == "📷 사진":
+            uploaded_files = st.file_uploader(
+                "사진 업로드 (여러 장 가능)", type=["jpg", "jpeg", "png"],
+                help="JPG, PNG / 최대 10MB",
+                accept_multiple_files=True,
+            )
+        elif method == "✏️ 수동":
+            manual_text = st.text_area(
+                "음식 목록 (한 줄에 하나씩)",
+                placeholder="연어스테이크 1인분\n함박스테이크 반인분\n와인 1병",
+                height=100,
+            )
+        elif method == "⭐ 즐겨찾기":
+            if fav_names:
+                selected_favs = st.multiselect(
+                    "음식 선택", fav_names,
+                )
+            else:
+                st.caption("즐겨찾기가 비어있습니다. 설정 > 즐겨찾기에서 등록하세요.")
 
-    # 폼 제출 처리
-    if meal_submitted:
-        pending = []
-        has_error = False
+        meal_submitted = st.form_submit_button(
+            "🔍 분석 및 저장", type="primary", use_container_width=True,
+        )
 
-        for uploaded in uploaded_files or []:
-            if uploaded.size > MAX_FILE_SIZE:
-                st.error(f"{uploaded.name}: 10MB 초과")
+# 폼 제출 처리
+if meal_submitted:
+    pending = []
+    has_error = False
+
+    for uploaded in uploaded_files or []:
+        if uploaded.size > MAX_FILE_SIZE:
+            st.error(f"{uploaded.name}: 10MB 초과")
+            has_error = True
+            continue
+        st.image(uploaded, width=180)
+        ext = uploaded.name.rsplit(".", 1)[-1].lower()
+        media_map = {"jpg": "image/jpeg", "jpeg": "image/jpeg", "png": "image/png"}
+        with st.spinner(f"🔍 {uploaded.name} AI 분석 중... (5~15초 소요)"):
+            try:
+                result = analyze_food_image(uploaded.getvalue(), media_map.get(ext, "image/jpeg"))
+                if result and not result.get("error") and result.get("foods"):
+                    for f in result["foods"]:
+                        f["source"] = "ai"
+                    pending.extend(result["foods"])
+            except Exception as e:
+                st.error(f"분석 오류: {e}")
                 has_error = True
-                continue
-            st.image(uploaded, width=180)
-            ext = uploaded.name.rsplit(".", 1)[-1].lower()
-            media_map = {"jpg": "image/jpeg", "jpeg": "image/jpeg", "png": "image/png"}
-            with st.spinner(f"🔍 {uploaded.name} AI 분석 중... (5~15초 소요)"):
+
+    food_lines = [l.strip() for l in manual_text.strip().split("\n") if l.strip()] if manual_text.strip() else []
+    if food_lines:
+        local_hits = []
+        needs_ai = []
+        for line in food_lines:
+            bare_name = line.split(" ")[0] if " " in line else line
+            found = lookup_food_nutrition(email, bare_name)
+            if found:
+                local_hits.append(found)
+            else:
+                needs_ai.append(line)
+        if local_hits:
+            pending.extend(local_hits)
+            st.info(f"✅ {len(local_hits)}개 음식을 기존 기록에서 가져왔습니다 (AI 호출 생략)")
+        if needs_ai:
+            with st.spinner(f"🔍 {len(needs_ai)}개 음식 AI 추정 중..."):
                 try:
-                    result = analyze_food_image(uploaded.getvalue(), media_map.get(ext, "image/jpeg"))
-                    if result and not result.get("error") and result.get("foods"):
-                        for f in result["foods"]:
-                            f["source"] = "ai"
-                        pending.extend(result["foods"])
+                    estimated = estimate_multiple_foods(needs_ai)
+                    for f in estimated:
+                        f["source"] = "manual"
+                    pending.extend(estimated)
                 except Exception as e:
-                    st.error(f"분석 오류: {e}")
+                    st.error(f"추정 실패: {e}")
                     has_error = True
 
-        food_lines = [l.strip() for l in manual_text.strip().split("\n") if l.strip()] if manual_text.strip() else []
-        if food_lines:
-            # 1단계: 로컬 기록 조회 (즐겨찾기 + 최근 30일) — Gemini 호출 없음
-            local_hits = []
-            needs_ai = []
-            for line in food_lines:
-                # "반인분", "2인분" 등 수량 표현 제거하고 음식명만 추출
-                bare_name = line.split(" ")[0] if " " in line else line
-                found = lookup_food_nutrition(email, bare_name)
-                if found:
-                    local_hits.append(found)
-                else:
-                    needs_ai.append(line)
+    if selected_favs:
+        for sel_name in selected_favs:
+            for fav in favorites:
+                display = f"{fav['food_name']} ({fav.get('calories', 0)}kcal)"
+                if display == sel_name:
+                    pending.append({
+                        "name": fav["food_name"], "amount": fav.get("amount", ""),
+                        "calories": int(fav.get("calories", 0)),
+                        "carbs": int(fav.get("carbs", 0)),
+                        "protein": int(fav.get("protein", 0)),
+                        "fat": int(fav.get("fat", 0)),
+                        "quantity": 1.0, "source": "favorite",
+                    })
+                    break
 
-            if local_hits:
-                pending.extend(local_hits)
-                st.info(f"✅ {len(local_hits)}개 음식을 기존 기록에서 가져왔습니다 (AI 호출 생략)")
+    if pending:
+        save_meals(email, date_str, meal_type, pending)
+        total = sum(f.get("calories", 0) * f.get("quantity", 1) for f in pending)
+        st.toast(f"✅ {meal_type} {len(pending)}개 ({total:,.0f}kcal) 저장!", icon="🍽️")
 
-            # 2단계: 로컬에 없는 음식만 Gemini 호출
-            if needs_ai:
-                with st.spinner(f"🔍 {len(needs_ai)}개 음식 AI 추정 중..."):
-                    try:
-                        estimated = estimate_multiple_foods(needs_ai)
-                        for f in estimated:
-                            f["source"] = "manual"
-                        pending.extend(estimated)
-                    except Exception as e:
-                        st.error(f"추정 실패: {e}")
-                        has_error = True
+        auto_added = auto_add_favorites_from_meals(email)
+        for fname in auto_added:
+            st.toast(f"⭐ {fname} 자주 드셔서 즐겨찾기에 자동 등록!", icon="⭐")
 
-        if selected_favs:
-            for sel_name in selected_favs:
-                for fav in favorites:
-                    display = f"{fav['food_name']} ({fav.get('calories', 0)}kcal)"
-                    if display == sel_name:
-                        pending.append({
-                            "name": fav["food_name"], "amount": fav.get("amount", ""),
-                            "calories": int(fav.get("calories", 0)),
-                            "carbs": int(fav.get("carbs", 0)),
-                            "protein": int(fav.get("protein", 0)),
-                            "fat": int(fav.get("fat", 0)),
-                            "quantity": 1.0, "source": "favorite",
-                        })
-                        break
+        new_eaten = eaten_cal + total
+        new_protein = t_protein + sum(f.get("protein", 0) * f.get("quantity", 1) for f in pending)
+        if eaten_cal < daily_budget <= new_eaten:
+            st.toast("🎉 오늘 칼로리 목표 달성!", icon="🎯")
+        if t_protein < target_protein <= new_protein:
+            st.toast(f"🥩 단백질 목표 달성! ({new_protein:.0f}g)", icon="💪")
 
-        if pending:
-            save_meals(email, date_str, meal_type, pending)
-            total = sum(f.get("calories", 0) * f.get("quantity", 1) for f in pending)
-            st.toast(f"✅ {meal_type} {len(pending)}개 ({total:,.0f}kcal) 저장!", icon="🍽️")
-
-            # 자주 먹는 음식(5회 이상) 자동 즐겨찾기 등록
-            auto_added = auto_add_favorites_from_meals(email)
-            for fname in auto_added:
-                st.toast(f"⭐ {fname} 자주 드셔서 즐겨찾기에 자동 등록!", icon="⭐")
-
-            # 목표 달성 축하 토스트
-            new_eaten = eaten_cal + total
-            new_protein = t_protein + sum(f.get("protein", 0) * f.get("quantity", 1) for f in pending)
-            if eaten_cal < daily_budget <= new_eaten:
-                st.toast("🎉 오늘 칼로리 목표 달성!", icon="🎯")
-            if t_protein < target_protein <= new_protein:
-                st.toast(f"🥩 단백질 목표 달성! ({new_protein:.0f}g)", icon="💪")
-
-        if not has_error:
-            st.session_state.form_version += 1
-            st.rerun()
-
-# ─── 탭 2: 물 ────────────────────────────────────────────────
-with tab_water:
-    total_water = get_water_log(email, date_str)
-    pct = min(total_water / WATER_TARGET_ML * 100, 100)
-    st.markdown(f"**오늘 섭취: {total_water}ml / {WATER_TARGET_ML}ml ({pct:.0f}%)**")
-
-    wfv = st.session_state.form_version
-    water_ml = st.number_input(
-        "추가 섭취량 (ml)", min_value=0, max_value=2000, value=0, step=100,
-        key=f"water_amt_{wfv}",
-    )
-    wbc1, wbc2 = st.columns(2)
-    if wbc1.button("💧 물 저장", use_container_width=True, type="primary", key="btn_save_water"):
-        if water_ml > 0:
-            save_water(email, date_str, water_ml)
-            st.toast(f"✅ 물 {water_ml}ml 추가!", icon="💧")
-            st.session_state.form_version += 1
-            st.rerun()
-    if wbc2.button("초기화", use_container_width=True, key="btn_reset_water"):
-        reset_water(email, date_str)
-        st.toast("물 기록 초기화", icon="🔄")
+    if not has_error:
+        st.session_state.form_version += 1
         st.rerun()
 
-    # 빠른 추가 버튼
-    st.caption("빠른 추가:")
-    qc1, qc2, qc3, qc4 = st.columns(4)
-    for col, ml in [(qc1, 200), (qc2, 330), (qc3, 500), (qc4, 1000)]:
-        if col.button(f"{ml}ml", use_container_width=True, key=f"qwater_{ml}"):
-            save_water(email, date_str, ml)
-            st.toast(f"✅ 물 {ml}ml 추가!", icon="💧")
-            st.rerun()
-
-# ─── 탭 3: 메모 ─────────────────────────────────────────────
-with tab_memo:
-    existing_memo = get_memo(email, date_str)
-    existing_cond = existing_memo.get("condition", "") if existing_memo else ""
-    existing_text = existing_memo.get("memo", "") if existing_memo else ""
-
-    cond_idx = CONDITION_OPTIONS.index(existing_cond) if existing_cond in CONDITION_OPTIONS else 0
-    memo_condition = st.selectbox("컨디션", CONDITION_OPTIONS, index=cond_idx, key=f"mcond_{date_str}")
-    memo_text = st.text_area("메모", value=existing_text, placeholder="오늘 식단에 대한 메모",
-                              height=100, key=f"mmemo_{date_str}")
-
-    if st.button("📝 메모 저장", use_container_width=True, type="primary"):
-        save_memo(email, date_str, memo_condition, memo_text.strip())
-        st.toast("✅ 메모 저장!", icon="📝")
-        st.rerun()
 
 # ═══════════════════════════════════════════════════════════════
 # 저장된 기록 (시간순 + 카드형 + 컬러바 + 삭제취소)
@@ -794,18 +694,6 @@ ex_log = get_exercise_log(email, date_str, date_str)
 if not ex_log.empty:
     ex_count = len(ex_log)
     st.caption(f"🏃 운동 {ex_count}개 · {burned_cal:,.0f} kcal 소모 — 상세 편집은 [운동 기록] 페이지에서")
-
-# ─── 물 섭취 표시 ────────────────────────────────────────────
-if total_water > 0:
-    st.markdown(f"**💧 물 섭취** {total_water}ml / {WATER_TARGET_ML}ml ({pct:.0f}%)")
-
-# ─── 메모/컨디션 표시 ────────────────────────────────────────
-saved_memo = get_memo(email, date_str)
-if saved_memo:
-    st.markdown(
-        f"**📝 컨디션**: {saved_memo.get('condition', '')}  \n"
-        f"**메모**: {saved_memo.get('memo', '') or '없음'}",
-    )
 
 # ─── 운동 추천 ───────────────────────────────────────────────
 if not saved.empty:

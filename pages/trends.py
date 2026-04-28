@@ -276,17 +276,23 @@ else:
         x=bal_df["label"], y=bal_df["total_expend"], name="소모",
         marker_color="#3B82F6", opacity=0.65,
     ))
+    # 칼로리 목표 라인 (주 Y축)
+    fig_bal.add_hline(
+        y=target, line_dash="dash", line_color="#4ADE80", line_width=2,
+        annotation_text=f"목표 {target:,}", annotation_position="top right",
+        annotation_font=dict(color="#4ADE80", size=11),
+    )
     # 섭취 - 소모 라인 (보조 Y축)
     fig_bal.add_trace(go.Scatter(
         x=bal_df["label"], y=bal_df["diff"], name="섭취-소모",
         mode="lines+markers",
-        line=dict(color="#4ADE80", width=2),
-        marker=dict(size=6, color="#4ADE80"),
+        line=dict(color="#A78BFA", width=2),
+        marker=dict(size=6, color="#A78BFA"),
         yaxis="y2",
     ))
     fig_bal.update_layout(
         **PLOT_CFG, height=320, barmode="group",
-        xaxis_title=None, yaxis_title="kcal (막대)",
+        xaxis_title=None, yaxis_title="kcal (막대 + 목표선)",
         yaxis2=dict(
             title="섭취-소모 (라인)", overlaying="y", side="right",
             zeroline=True, zerolinecolor="rgba(148,163,184,0.5)",

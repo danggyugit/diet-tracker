@@ -46,7 +46,7 @@ if _comp_raw not in ("off", "avg7", "daily"):
     _comp_raw = "off"
 cal_comp_mode = _comp_raw
 
-# ─── 연/월 드롭다운 (한 줄) ──────────────────────────────────
+# ─── 연/월 드롭다운 (CSS로 모바일 가로 강제) ─────────────────
 if "cal_year" not in st.session_state:
     st.session_state.cal_year = today_kst().year
 if "cal_month" not in st.session_state:
@@ -54,12 +54,21 @@ if "cal_month" not in st.session_state:
 
 _this_year = today_kst().year
 year_options = list(range(_this_year - 3, _this_year + 2))
-month_options = list(range(1, 13))
-
 if st.session_state.cal_year not in year_options:
     year_options = sorted(set(year_options + [st.session_state.cal_year]))
+month_options = list(range(1, 13))
 
-yc, mc = st.columns(2)
+# 모바일에서도 두 컬럼 가로 강제 (Streamlit 기본 wrapping 무력화)
+st.markdown(
+    "<style>"
+    "div[data-testid='stHorizontalBlock'] { flex-wrap: nowrap !important; }"
+    "div[data-testid='stHorizontalBlock'] > div[data-testid='column'] { "
+    "  flex: 1 1 0 !important; min-width: 0 !important; }"
+    "</style>",
+    unsafe_allow_html=True,
+)
+
+yc, mc = st.columns(2, gap="small")
 sel_year = yc.selectbox(
     "년도",
     year_options,
