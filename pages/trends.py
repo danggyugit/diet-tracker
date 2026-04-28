@@ -249,9 +249,9 @@ else:
     )
     st.plotly_chart(fig_weight, use_container_width=True)
 
-# ─── 에너지 균형 차트 (섭취·소모 막대 + 차이 라인) ────────────
-st.markdown("#### ⚡ 일별 에너지 균형")
-st.caption("섭취(주황)·소모(파랑) 막대 + 차이(초록 라인) — 라인이 0 아래면 적자")
+# ─── 일별 적자/흑자 막대 (단순) ──────────────────────────────
+st.markdown("#### ⚡ 일별 칼로리 균형")
+st.caption("0 아래 초록 = 빠지는 날 · 0 위 빨강 = 찌는 날")
 
 if totals.empty:
     st.info("📝 식단 기록이 없습니다.")
@@ -263,53 +263,60 @@ else:
         lambda d: f"{d.month}/{d.day}({weekday_names[d.weekday()]})"
     )
     bal_df["burned"] = bal_df["date"].apply(lambda d: float(burn_by_date.get(d, 0)))
-    bal_df["tdee_base"] = tdee
-    bal_df["total_expend"] = bal_df["tdee_base"] + bal_df["burned"]
-    bal_df["diff"] = bal_df["total_cal"] - bal_df["total_expend"]  # 섭취 - 소모
+    bal_df["total_expend"] = tdee + bal_df["burned"]
+    bal_df["diff"] = bal_df["total_cal"] - bal_df["total_expend"]  # 음수=적자, 양수=흑자
 
-    fig_bal = go.Figure()
-    fig_bal.add_trace(go.Bar(
-        x=bal_df["label"], y=bal_df["total_cal"], name="섭취",
-        marker_color="#FBBF24", opacity=0.85,
-    ))
-    fig_bal.add_trace(go.Bar(
-        x=bal_df["label"], y=bal_df["total_expend"], name="소모",
-        marker_color="#3B82F6", opacity=0.65,
-    ))
-    # 칼로리 목표 라인 (주 Y축)
-    fig_bal.add_hline(
-        y=target, line_dash="dash", line_color="#4ADE80", line_width=2,
-        annotation_text=f"목표 {target:,}", annotation_position="top right",
-        annotation_font=dict(color="#4ADE80", size=11),
-    )
-    # 섭취 - 소모 라인 (보조 Y축)
-    fig_bal.add_trace(go.Scatter(
-        x=bal_df["label"], y=bal_df["diff"], name="섭취-소모",
-        mode="lines+markers",
-        line=dict(color="#A78BFA", width=2),
-        marker=dict(size=6, color="#A78BFA"),
-        yaxis="y2",
-    ))
-    fig_bal.update_layout(
-        **PLOT_CFG, height=320, barmode="group",
-        xaxis_title=None, yaxis_title="kcal (막대 + 목표선)",
-        yaxis2=dict(
-            title="섭취-소모 (라인)", overlaying="y", side="right",
-            zeroline=True, zerolinecolor="rgba(148,163,184,0.5)",
-            zerolinewidth=1.5, showgrid=False,
+    # 막대 색상: 적자(음수) 초록, 흑자(양수) 빨강
+    bar_colors = ["#22C55E" if v <= 0 else "#EF4444" for v in bal_df["diff"]]
+
+    fig_bal = go.Figure(go.Bar(
+        x=bal_df["label"], y=bal_df["diff"],
+        marker_color=bar_colors,
+        customdata=list(zip(bal_df["total_cal"], bal_df["burned"], bal_df["total_expend"])),
+        hovertemplate=(
+            "<b>%{x}</b><br>"
+            "섭취 %{customdata[0]:,.0f} kcal<br>"
+            "소모 %{customdata[2]:,.0f} kcal (TDEE %{customdata[2]:,.0f} 중 운동 %{customdata[1]:,.0f})<br>"
+            "<b>%{y:+,.0f} kcal</b><extra></extra>"
         ),
-        margin=dict(l=40, r=50, t=30, b=30),
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="center", x=0.5),
+    ))
+    fig_bal.add_hline(y=0, line_color="rgba(148,163,184,0.6)", line_width=1.5)
+    fig_bal.update_layout(
+        **PLOT_CFG, height=280,
+        xaxis_title=None, yaxis_title="섭취-소모 (kcal)",
+        margin=dict(l=50, r=15, t=20, b=30),
+        showlegend=False,
+        bargap=0.25,
     )
     st.plotly_chart(fig_bal, use_container_width=True)
 
+    # 누적 요약 (간결)
     cum_total = bal_df["diff"].sum()
     cum_kg = cum_total / 7700
     cum_days = len(bal_df)
+    deficit_days = int((bal_df["diff"] <= 0).sum())
+    surplus_days = int((bal_df["diff"] > 0).sum())
+
+    color = "#22C55E" if cum_total <= 0 else "#EF4444"
+    icon = "📉" if cum_total <= 0 else "📈"
     st.markdown(
-        f"<div style='text-align:center;font-size:13px;color:#94A3B8;margin:4px 0;'>"
-        f"📊 {cum_days}일 누적: <b style='color:{'#4ADE80' if cum_total <= 0 else '#FB7185'};'>"
-        f"{cum_total:+,.0f} kcal</b> ≈ <b>{cum_kg:+.2f} kg</b></div>",
+        f"<div style='display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin:8px 0;text-align:center;'>"
+        f"<div style='background:rgba(30,41,59,0.5);border-radius:10px;padding:10px;'>"
+        f"<div style='font-size:11px;color:#94A3B8;'>{cum_days}일 누적</div>"
+        f"<div style='font-size:18px;font-weight:700;color:{color};'>{cum_total:+,.0f}</div>"
+        f"<div style='font-size:10px;color:#64748B;'>kcal</div></div>"
+        f"<div style='background:rgba(30,41,59,0.5);border-radius:10px;padding:10px;'>"
+        f"<div style='font-size:11px;color:#94A3B8;'>예상 체중</div>"
+        f"<div style='font-size:18px;font-weight:700;color:{color};'>{cum_kg:+.2f}</div>"
+        f"<div style='font-size:10px;color:#64748B;'>kg {icon}</div></div>"
+        f"<div style='background:rgba(30,41,59,0.5);border-radius:10px;padding:10px;'>"
+        f"<div style='font-size:11px;color:#94A3B8;'>적자/흑자</div>"
+        f"<div style='font-size:18px;font-weight:700;'>"
+        f"<span style='color:#22C55E;'>{deficit_days}</span>"
+        f"<span style='color:#64748B;'>/</span>"
+        f"<span style='color:#EF4444;'>{surplus_days}</span></div>"
+        f"<div style='font-size:10px;color:#64748B;'>일</div></div>"
+        f"</div>",
         unsafe_allow_html=True,
     )
 
