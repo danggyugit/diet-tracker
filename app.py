@@ -4,7 +4,6 @@ Google OAuth 인증 + st.navigation 기반 멀티페이지 라우팅.
 """
 
 import streamlit as st
-import streamlit.components.v1 as components
 
 from services.auth_service import is_logged_in, render_sidebar_account
 
@@ -42,32 +41,8 @@ PAGES = {
 
 pg = st.navigation(PAGES, position="sidebar")
 
-# ─── 로그인 후 전용: 모바일 키보드 차단 + 상단 네비게이션 ────
+# ─── 상단 네비게이션 바 (HTML grid + query_params) ────────────
 if is_logged_in():
-    # 모바일에서 date_input 탭 시 키보드 활성화 차단
-    components.html(
-        """
-        <script>
-        (function() {
-            const root = window.parent.document;
-            const fix = () => {
-                root.querySelectorAll('[data-testid="stDateInput"] input').forEach(el => {
-                    if (!el.dataset.kbDisabled) {
-                        el.setAttribute('inputmode', 'none');
-                        el.setAttribute('readonly', 'readonly');
-                        el.dataset.kbDisabled = '1';
-                    }
-                });
-            };
-            fix();
-            const obs = new MutationObserver(fix);
-            obs.observe(root.body, { childList: true, subtree: true });
-        })();
-        </script>
-        """,
-        height=0,
-    )
-
     NAV_ITEMS = [
         ("🍽️", "record", "pages/record.py", "식단 기록"),
         ("🏃", "exercise", "pages/exercise.py", "운동 기록"),
