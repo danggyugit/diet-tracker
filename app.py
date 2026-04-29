@@ -4,6 +4,7 @@ Google OAuth 인증 + st.navigation 기반 멀티페이지 라우팅.
 """
 
 import streamlit as st
+import streamlit.components.v1 as components
 
 from services.auth_service import is_logged_in, render_sidebar_account
 
@@ -18,6 +19,31 @@ st.set_page_config(
 st.markdown("""<style>
 .block-container { padding-top:4rem !important; }
 </style>""", unsafe_allow_html=True)
+
+# 모바일에서 date_input 탭 시 키보드 활성화 차단
+# (inputmode=none + readonly로 키보드는 막고 달력 팝오버는 그대로 동작)
+components.html(
+    """
+    <script>
+    (function() {
+        const root = window.parent.document;
+        const fix = () => {
+            root.querySelectorAll('[data-testid="stDateInput"] input').forEach(el => {
+                if (!el.dataset.kbDisabled) {
+                    el.setAttribute('inputmode', 'none');
+                    el.setAttribute('readonly', 'readonly');
+                    el.dataset.kbDisabled = '1';
+                }
+            });
+        };
+        fix();
+        const obs = new MutationObserver(fix);
+        obs.observe(root.body, { childList: true, subtree: true });
+    })();
+    </script>
+    """,
+    height=0,
+)
 
 render_sidebar_account()
 
